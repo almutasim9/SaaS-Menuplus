@@ -1,0 +1,189 @@
+[dotenv@17.3.1] injecting env (3) from .env.local -- tip: ⚙️  suppress all logs with { quiet: true }
+Fetching full schema details from PostgREST...
+
+Table: delivery_zones
+  - id
+  - restaurant_id
+  - zone_name
+  - flat_rate
+  - free_delivery_threshold
+  - is_active
+  - created_at
+
+Table: working_hours
+  - id
+  - restaurant_id
+  - day_of_week
+  - open_time
+  - close_time
+  - is_closed
+  - created_at
+
+Table: orders
+  - id
+  - restaurant_id
+  - customer_name
+  - customer_phone
+  - customer_address
+  - items
+  - subtotal
+  - discount_amount
+  - delivery_fee
+  - total
+  - coupon_code
+  - status
+  - created_at
+  - order_type
+  - table_number
+  - number_of_people
+  - area_name
+  - nearest_landmark
+  - car_details
+
+Table: restaurants
+  - id
+  - name
+  - slug
+  - owner_id
+  - primary_color
+  - logo_url
+  - banner_url
+  - created_at
+  - is_dine_in_enabled
+  - is_takeaway_enabled
+  - is_delivery_enabled
+  - social_links
+  - theme_settings
+  - is_free_delivery
+  - whatsapp_number
+  - is_whatsapp_ordering_enabled
+  - subscription_plan
+  - subscription_status
+  - trial_ends_at
+  - subscription_expires_at
+  - max_products
+  - max_orders_per_month
+  - custom_domain
+
+Table: delivery_settings
+  - id
+  - restaurant_id
+  - zone_name
+  - flat_rate
+  - free_delivery_threshold
+  - is_active
+  - created_at
+
+Table: fcm_tokens
+  - id
+  - user_id
+  - token
+  - platform
+  - last_seen
+
+Table: profiles
+  - id
+  - email
+  - full_name
+  - role
+  - restaurant_id
+  - created_at
+
+Table: visits
+  - id
+  - restaurant_id
+  - source
+  - created_at
+
+Table: product_variants
+  - id
+  - product_id
+  - name
+  - price
+  - sort_order
+  - created_at
+  - updated_at
+  - name_en
+  - name_ku
+
+Table: products
+  - id
+  - restaurant_id
+  - category_id
+  - name
+  - description
+  - price
+  - image_url
+  - is_available
+  - created_at
+  - brand
+  - vendor
+  - collection
+  - tags
+  - calories
+  - prep_time_minutes
+  - sort_order
+  - is_hidden
+  - compare_at_price
+  - is_discount_active
+  - deleted_at
+  - stock_count
+  - name_en
+  - name_ku
+  - description_en
+  - description_ku
+
+Table: product_addons
+  - id
+  - product_id
+  - name
+  - price
+  - sort_order
+  - created_at
+  - updated_at
+  - name_en
+  - name_ku
+
+Table: order_items
+  - id
+  - order_id
+  - product_id
+  - quantity
+  - unit_price
+  - item_name
+  - variant_details
+  - created_at
+
+Table: coupons
+  - id
+  - restaurant_id
+  - code
+  - discount_type
+  - discount_value
+  - applies_to
+  - product_id
+  - min_order
+  - max_uses
+  - used_count
+  - is_active
+  - expires_at
+  - created_at
+  - is_global
+  - deleted_at
+
+Table: delivery_areas
+  - id
+  - zone_id
+  - area_name
+  - created_at
+
+Table: categories
+  - id
+  - restaurant_id
+  - name
+  - sort_order
+  - created_at
+  - deleted_at
+  - name_en
+  - name_ku
+  - is_hidden

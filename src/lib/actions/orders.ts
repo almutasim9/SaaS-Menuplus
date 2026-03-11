@@ -6,6 +6,7 @@ import { createOrderSchema } from "@/lib/validations/schemas";
 import { z } from "zod";
 import { checkLimitAccess } from "@/lib/actions/subscription";
 import { headers } from "next/headers";
+import { sendPushNotification } from "@/lib/supabase/firebase-admin";
 
 export async function getOrders(restaurantId: string) {
     const supabase = await createClient();
@@ -139,6 +140,46 @@ export async function createOrder(orderData: any) {
                 // We don't fail the order if coupon fails post-insertion,
                 // but we log it. Ideally, validation happens before inserting the order.
             }
+        }
+
+        // --- Background Push Notification (FCM) ---
+        try {
+            // 1. Get restaurant owner ID
+            const { data: restaurant } = await adminClient
+                .from("restaurants")
+                .select("owner_id, name")
+                .eq("id", validatedData.restaurant_id)
+                .single();
+
+            if (restaurant?.owner_id) {
+                // 2. Get owner's FCM tokens
+                const { data: tokensData } = await adminClient
+                    .from("fcm_tokens")
+                    .select("token")
+                    .eq("user_id", restaurant.owner_id);
+
+                const fcmTokens = tokensData?.map(t => t.token) || [];
+
+                if (fcmTokens.length > 0) {
+                    const priceLabel = data.total?.toLocaleString() || '0';
+                    const typeLabel = data.order_type === 'delivery' ? '🛵 توصيل' : 
+                                     data.order_type === 'takeaway' ? '🥡 سفري' : '🍽️ محلي';
+
+                    await sendPushNotification({
+                        tokens: fcmTokens,
+                        title: `🔔 طلب جديد - ${restaurant.name}`,
+                        body: `طلب ${typeLabel} بمبلغ ${priceLabel} د.ع من ${data.customer_name || 'عميل'}`,
+                        data: {
+                            order_id: data.id,
+                            restaurant_id: data.restaurant_id,
+                            type: 'new_order'
+                        }
+                    });
+                }
+            }
+        } catch (pushError) {
+            console.error("[FCM Push Error]", pushError);
+            // Don't fail the order if push fails
         }
 
         return data;
