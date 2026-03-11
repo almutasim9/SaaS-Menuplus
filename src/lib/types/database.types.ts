@@ -536,6 +536,17 @@ export type DeliveryArea = Database["public"]["Tables"]["delivery_areas"]["Row"]
 export type WorkingHour = Database["public"]["Tables"]["working_hours"]["Row"];
 export type Coupon = Database["public"]["Tables"]["coupons"]["Row"];
 export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type ProductAvailability = {
+    id: string;
+    product_id: string;
+    day_of_week: number;
+    open_time: string;
+    close_time: string;
+    is_available_all_day: boolean;
+    is_enabled: boolean;
+    created_at: string;
+};
+
 
 export type OrderItem = {
     cart_item_id: string;
@@ -551,4 +562,5 @@ export type OrderItem = {
 export type ProductWithCustomization = Product & {
     product_variants?: ProductVariant[];
     product_addons?: ProductAddon[];
+    product_availability?: ProductAvailability[];
 };

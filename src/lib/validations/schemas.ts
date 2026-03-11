@@ -32,13 +32,6 @@ export const productSchema = z.object({
     image_url: z.string().url().nullable().optional(),
     is_available: z.boolean().default(true),
     is_hidden: z.boolean().default(false),
-    brand: z.string().nullable().optional(),
-    vendor: z.string().nullable().optional(),
-    collection: z.string().nullable().optional(),
-    tags: z.array(z.string()).nullable().optional(),
-    calories: z.number().nullable().optional(),
-    prep_time_minutes: z.number().nullable().optional(),
-    stock_count: z.number().nullable().optional(),
     variants: z.array(variantSchema).optional(),
     addons: z.array(addonSchema).optional(),
 });

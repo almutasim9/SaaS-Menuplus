@@ -50,7 +50,8 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                 .select(`
                     *,
                     product_variants (*),
-                    product_addons (*)
+                    product_addons (*),
+                    product_availability (*)
                 `)
                 .eq('restaurant_id', restaurant.id)
                 .eq('is_available', true)

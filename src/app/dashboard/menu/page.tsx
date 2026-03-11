@@ -26,9 +26,14 @@ import { createClient } from "@/lib/supabase/client";
 import { getProducts, createProduct, updateProduct, deleteProduct, toggleProductAvailability, toggleProductVisibility, updateProductOrder, updateProductDiscount, duplicateProduct } from "@/lib/actions/products";
 import { getCategories, createCategory, updateCategory, deleteCategory, updateCategoryOrder, toggleCategoryVisibility } from "@/lib/actions/categories";
 import { Plus, GripVertical, Pencil, Trash2, EyeOff, Eye, PackageX, PackageCheck, ImageIcon, Search, ChevronDown, Check, Tag, UtensilsCrossed, Percent, Copy } from "lucide-react";
+import { format24to12, format12to24 } from "@/lib/time-utils";
 import { toast } from "sonner";
+import { isProductCurrentlyAvailable, type AvailabilityRule } from "@/lib/utils/availability";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Product, Category, ProductVariant, ProductAddon } from "@/lib/types/database.types";
+import { useProductAvailability, useFeatureAccess } from "@/lib/hooks/useProductScheduling";
+import { Clock, Lock, ShieldCheck } from "lucide-react";
+
 import {
     DndContext,
     closestCenter,
@@ -53,6 +58,7 @@ type ProductWithCategory = Product & {
     categories: { name: string } | null;
     product_variants?: ProductVariant[];
     product_addons?: ProductAddon[];
+    product_availability?: AvailabilityRule[];
 };
 
 // SORTABLE PRODUCT COMPONENT
@@ -76,6 +82,11 @@ function SortableProductRow({
     onDuplicate: (id: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `prod-${product.id}`, data: { type: 'Product', product } });
+    const { t } = useTranslation();
+    
+    // Calculate current availability based on schedule
+    const schedulingStatus = isProductCurrentlyAvailable(product.product_availability);
+    const isScheduledOff = !schedulingStatus.isAvailable;
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -88,70 +99,78 @@ function SortableProductRow({
         <div
             ref={setNodeRef}
             style={style}
-            className={`glass-card rounded-xl p-3 flex items-center gap-4 transition-colors ${isDragging ? "bg-white/10 shadow-lg ring-1 ring-primary" : "hover:bg-white/[0.04] bg-secondary/10"
-                }`}
+            className={`glass-card rounded-2xl p-5 flex items-center gap-6 mb-3 transition-all duration-300 border border-white/5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 group ${isDragging ? 'opacity-50 ring-2 ring-primary bg-primary/5' : 'bg-secondary/10 hover:bg-white/[0.04]'}`}
         >
-            <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-white/5 rounded">
-                <GripVertical className="w-4 h-4 text-muted-foreground/40 transition-colors hover:text-foreground" />
+
+            <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-2 -ml-2 hover:bg-white/5 rounded-xl transition-colors group-hover:text-primary/60 text-muted-foreground/30">
+                <GripVertical className="w-5 h-5" />
             </div>
 
-            <div className={`w-12 h-12 rounded-lg bg-secondary/30 relative overflow-hidden flex-shrink-0 ${product.is_hidden ? 'opacity-50 grayscale' : ''}`}>
+
+            <div className={`w-16 h-16 rounded-2xl bg-secondary/30 relative overflow-hidden flex-shrink-0 border border-border/10 transition-transform group-hover:scale-105 duration-300 ${(product.is_hidden || isScheduledOff) ? 'opacity-50 grayscale' : ''}`}>
                 {product.image_url ? (
                     <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                    <div className="flex items-center justify-center h-full">
-                        <ImageIcon className="w-5 h-5 text-muted-foreground/30" />
+                    <div className="flex items-center justify-center h-full bg-secondary/20">
+                        <ImageIcon className="w-7 h-7 text-muted-foreground/20" />
                     </div>
                 )}
             </div>
 
-            <div className={`flex-1 min-w-0 ${product.is_hidden ? 'opacity-60' : ''}`}>
-                <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-sm">{product.name}</h4>
+
+            <div className={`flex-1 min-w-0 ${(product.is_hidden || isScheduledOff) ? 'opacity-60' : ''}`}>
+                <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-bold text-base group-hover:text-primary transition-colors">{product.name}</h4>
                     {product.is_hidden && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1 py-0">Hidden</Badge>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 py-0 border-amber-500/30 text-amber-500">Hidden</Badge>
                     )}
                     {!product.is_available && (
-                        <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/20 text-red-500">Out of Stock</Badge>
+                        <Badge variant="destructive" className="text-[10px] h-4 px-1.5 py-0 bg-red-500/20 text-red-500 border-none">Out of Stock</Badge>
+                    )}
+                    {isScheduledOff && product.is_available && (
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 py-0 border-blue-500/30 text-blue-500 bg-blue-500/5 uppercase tracking-tighter">مغلق حسب الجدول</Badge>
                     )}
                     {(product.stock_count !== null && product.stock_count > 0 && product.stock_count <= 5) && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1 py-0 border-amber-500 text-amber-500 bg-amber-500/10">Low Stock: {product.stock_count}</Badge>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 py-0 border-amber-500 text-amber-500 bg-amber-500/10 uppercase tracking-tighter font-bold">Low Stock: {product.stock_count}</Badge>
                     )}
                     {(product.stock_count === 0) && (
-                        <Badge variant="destructive" className="text-[10px] h-4 px-1 py-0 bg-red-500/20 text-red-500">Zero Stock</Badge>
+                        <Badge variant="destructive" className="text-[10px] h-4 px-1.5 py-0 bg-red-500/20 text-red-500 border-none uppercase tracking-tighter font-bold">Zero Stock</Badge>
                     )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{product.description || "No description"}</p>
+                <p className="text-sm text-muted-foreground/70 truncate max-w-md">{product.description || "لا يوجد وصف للمنتج"}</p>
             </div>
 
-            <div className="flex items-center gap-3">
-                <span className="font-semibold text-sm mr-2">{Number(product.price).toFixed(0)} د.ع</span>
 
-                <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" title={product.is_available ? "Mark Out of Stock" : "Mark In Stock"} className={`h-7 w-7 rounded-lg z-10 relative ${!product.is_available ? 'text-red-500 hover:text-red-600 hover:bg-red-500/10' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10'}`} onClick={(e) => { e.stopPropagation(); onToggleAvailability(product.id, product.is_available); }}>
-                        {product.is_available ? <PackageCheck className="w-3.5 h-3.5" /> : <PackageX className="w-3.5 h-3.5" />}
+            <div className="flex items-center gap-4">
+                <span className="font-bold text-lg text-primary/90 mr-4 tabular-nums">{Number(product.price).toLocaleString()} <span className="text-[10px] font-medium opacity-60">د.ع</span></span>
+
+
+                <div className="flex items-center gap-1.5 p-1.5 bg-black/5 dark:bg-white/5 rounded-2xl border border-white/5">
+                    <Button variant="ghost" size="icon" title={product.is_available ? "Mark Out of Stock" : "Mark In Stock"} className={`h-9 w-9 rounded-xl z-10 relative transition-all ${!product.is_available ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10'}`} onClick={(e) => { e.stopPropagation(); onToggleAvailability(product.id, product.is_available); }}>
+                        {product.is_available ? <PackageCheck className="w-4 h-4" /> : <PackageX className="w-4 h-4" />}
                     </Button>
                     {onItemDiscount && (
-                        <Button variant="ghost" size="icon" title="Item Discount" className={`h-7 w-7 rounded-lg z-10 relative ${product.is_discount_active ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground'}`} onClick={(e) => { e.stopPropagation(); onItemDiscount(product); }}>
+                        <Button variant="ghost" size="icon" title="Item Discount" className={`h-9 w-9 rounded-xl z-10 relative transition-all ${product.is_discount_active ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20' : 'hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground'}`} onClick={(e) => { e.stopPropagation(); onItemDiscount(product); }}>
                             <div className="relative">
-                                <Percent className="w-3.5 h-3.5" />
-                                {product.is_discount_active && <div className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                                <Percent className="w-4 h-4" />
+                                {product.is_discount_active && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />}
                             </div>
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" title={product.is_hidden ? "Show in menu" : "Hide from menu"} className={`h-7 w-7 rounded-lg z-10 relative ${product.is_hidden ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/10' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`} onClick={(e) => { e.stopPropagation(); onToggleVisibility(product.id, product.is_hidden); }}>
-                        {product.is_hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <Button variant="ghost" size="icon" title={product.is_hidden ? "Show in menu" : "Hide from menu"} className={`h-9 w-9 rounded-xl z-10 relative transition-all ${product.is_hidden ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`} onClick={(e) => { e.stopPropagation(); onToggleVisibility(product.id, product.is_hidden); }}>
+                        {product.is_hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary z-10 relative" onClick={(e) => { e.stopPropagation(); onEdit(product); }}>
-                        <Pencil className="w-3.5 h-3.5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary z-10 relative transition-all" onClick={(e) => { e.stopPropagation(); onEdit(product); }}>
+                        <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" title="Duplicate item" className="h-7 w-7 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-500 z-10 relative" onClick={(e) => { e.stopPropagation(); onDuplicate(product.id); }}>
-                        <Copy className="w-3.5 h-3.5" />
+                    <Button variant="ghost" size="icon" title="Duplicate item" className="h-9 w-9 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 z-10 relative transition-all" onClick={(e) => { e.stopPropagation(); onDuplicate(product.id); }}>
+                        <Copy className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-destructive/10 hover:text-destructive z-10 relative" onClick={(e) => { e.stopPropagation(); onDelete(product.id); }}>
-                        <Trash2 className="w-3.5 h-3.5" />
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive z-10 relative transition-all" onClick={(e) => { e.stopPropagation(); onDelete(product.id); }}>
+                        <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
+
             </div>
         </div>
     );
@@ -275,6 +294,41 @@ export default function MenuItemsPage() {
 
     const [activeId, setActiveId] = useState<string | null>(null);
 
+    // Availability Data
+    const { availability: schedule, updateAvailability, isLoading: isSchedLoading } = useProductAvailability(editingProduct?.id || null);
+    const { data: hasAccess } = useFeatureAccess(restaurantId, "product_scheduling");
+
+    const [localSchedule, setLocalSchedule] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (schedule && schedule.length > 0) {
+            setLocalSchedule(schedule);
+        } else if (!isSchedLoading) {
+            // Default schedule: all days enabled, all day available
+            setLocalSchedule([...Array(7)].map((_, i) => ({
+                day_of_week: i,
+                open_time: "08:00:00",
+                close_time: "23:00:00",
+                is_available_all_day: true,
+                is_enabled: true
+            })));
+        }
+    }, [schedule, editingProduct, isSchedLoading]);
+
+
+    const handleToggleDay = (dayIndex: number) => {
+        setLocalSchedule(prev => prev.map(s => 
+            s.day_of_week === dayIndex ? { ...s, is_enabled: !s.is_enabled } : s
+        ));
+    };
+
+    const handleUpdateDay = (dayIndex: number, field: string, value: any) => {
+        setLocalSchedule(prev => prev.map(s => 
+            s.day_of_week === dayIndex ? { ...s, [field]: value } : s
+        ));
+    };
+
+
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -324,10 +378,10 @@ export default function MenuItemsPage() {
         try {
             if (editingCategory) {
                 await updateCategory(editingCategory.id, name, name_en, name_ku, sort_order);
-                toast.success("Category updated");
+                toast.success(t("menu.categoryUpdated") || "تم تحديث القسم بنجاح");
             } else {
                 await createCategory(restaurantId, name, name_en, name_ku, sort_order);
-                toast.success("Category created");
+                toast.success(t("menu.categoryCreated") || "تم إنشاء القسم بنجاح");
             }
             setCategoryDialogOpen(false);
             setEditingCategory(null);
@@ -345,7 +399,7 @@ export default function MenuItemsPage() {
         try {
             await deleteCategory(id);
             setCategories(categories.filter((c) => c.id !== id));
-            toast.success("Category deleted");
+            toast.success(t("menu.categoryDeleted") || "تم حذف القسم بنجاح");
         } catch (e: any) {
             toast.error(e.message || "Failed to delete");
         }
@@ -355,7 +409,7 @@ export default function MenuItemsPage() {
         try {
             await toggleCategoryVisibility(id, !currentHidden);
             setCategories(categories.map((c) => (c.id === id ? { ...c, is_hidden: !currentHidden } : c)));
-            toast.success(currentHidden ? "Category is now visible" : "Category hidden from menu");
+            toast.success(currentHidden ? (t("menu.categoryVisible") || "القسم الآن مرئي") : (t("menu.categoryHidden") || "تم إخفاء القسم من القائمة"));
         } catch {
             toast.error("Failed to update category visibility");
         }
@@ -383,11 +437,20 @@ export default function MenuItemsPage() {
         try {
             if (editingProduct) {
                 await updateProduct(editingProduct.id, formData);
-                toast.success("Product updated");
+                // Also update availability if it's a pro user
+                if (hasAccess) {
+                    await updateAvailability({ productId: editingProduct.id, data: localSchedule });
+                }
+                toast.success(t("menu.productUpdated") || "تم تحديث المنتج بنجاح");
             } else {
-                await createProduct(formData);
-                toast.success("Product created");
+                const newP = await createProduct(formData);
+                // Also update availability if it's a pro user
+                if (hasAccess && newP) {
+                    await updateAvailability({ productId: newP.id, data: localSchedule });
+                }
+                toast.success(t("menu.productCreated") || "تم إضافة المنتج بنجاح");
             }
+
             setProductDialogOpen(false);
             setEditingProduct(null);
             setVariants([]);
@@ -403,7 +466,7 @@ export default function MenuItemsPage() {
         try {
             await deleteProduct(id);
             setProducts(products.filter((p) => p.id !== id));
-            toast.success("Product deleted");
+            toast.success(t("menu.productDeleted") || "تم حذف المنتج بنجاح");
         } catch {
             toast.error("Failed to delete");
         }
@@ -413,7 +476,7 @@ export default function MenuItemsPage() {
         try {
             await toggleProductAvailability(id, !current);
             setProducts(products.map((p) => (p.id === id ? { ...p, is_available: !current } : p)));
-            toast.success(current ? "Marked as out of stock" : "Marked as available");
+            toast.success(current ? (t("menu.markedAvailable") || "تم التحديد كمتح") : (t("menu.markedOutOfStock") || "تم التحديد كنفاذ للمخزون"));
         } catch {
             toast.error("Failed to update availability");
         }
@@ -423,7 +486,7 @@ export default function MenuItemsPage() {
         try {
             await toggleProductVisibility(id, !currentHidden);
             setProducts(products.map((p) => (p.id === id ? { ...p, is_hidden: !currentHidden } : p)));
-            toast.success(currentHidden ? "Product is now visible in menu" : "Product hidden from menu");
+            toast.success(currentHidden ? (t("menu.productVisible") || "المنتج الآن مرئي في القائمة") : (t("menu.productHidden") || "تم إخفاء المنتج من القائمة"));
         } catch {
             toast.error("Failed to update visibility");
         }
@@ -721,9 +784,9 @@ export default function MenuItemsPage() {
                 {categories.length === 0 ? (
                     <div className="glass-card rounded-2xl p-12 text-center">
                         <UtensilsCrossed className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium mb-2">Your menu is empty</h3>
-                        <p className="text-sm text-muted-foreground mb-6">Create your first category to start adding items.</p>
-                        <Button onClick={() => setCategoryDialogOpen(true)} className="gradient-emerald text-white rounded-xl">Add Category</Button>
+                        <h3 className="text-lg font-medium mb-2">{t("menu.menuEmpty")}</h3>
+                        <p className="text-sm text-muted-foreground mb-6">{t("menu.createCategoryToStart")}</p>
+                        <Button onClick={() => setCategoryDialogOpen(true)} className="gradient-emerald text-white rounded-xl">{t("menu.addCategory")}</Button>
                     </div>
                 ) : (
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -782,55 +845,61 @@ export default function MenuItemsPage() {
             <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
                 <DialogContent className="glass-card border-border/50 rounded-2xl max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{editingCategory ? "Edit Category" : "New Category"}</DialogTitle>
+                        <DialogTitle>{editingCategory ? t("menu.editCategory") : t("menu.addCategory")}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleCategorySubmit} className="space-y-4 mt-4">
                         <div className="space-y-2">
-                            <Label>Name (Arabic) *</Label>
+                            <Label>{t("menu.nameAr")} *</Label>
                             <Input name="name" defaultValue={editingCategory?.name} required placeholder="e.g. الحلويات" className="rounded-xl bg-secondary/50" />
                         </div>
                         <div className="space-y-2">
-                            <Label>Name (English) <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                            <Label>{t("menu.nameEn")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
                             <Input name="name_en" defaultValue={editingCategory?.name_en || ""} placeholder="e.g. Desserts" className="rounded-xl bg-secondary/50" />
                         </div>
                         <div className="space-y-2">
-                            <Label>Name (Kurdish) <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                            <Label>{t("menu.nameKu")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
                             <Input name="name_ku" defaultValue={editingCategory?.name_ku || ""} placeholder="e.g. شیرینی" className="rounded-xl bg-secondary/50" />
                         </div>
                         <Button type="submit" className="w-full gradient-emerald text-white rounded-xl">
-                            {editingCategory ? "Update Category" : "Save Category"}
+                            {editingCategory ? t("menu.editCategory") : t("menu.addCategory")}
                         </Button>
                     </form>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
-                <DialogContent className="glass-card border-border/50 rounded-2xl max-w-xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="glass-card border-border/50 rounded-2xl sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{editingProduct ? "Edit Item" : "New Menu Item"}</DialogTitle>
+                        <DialogTitle>{editingProduct ? t("menu.editProduct") : t("menu.addProduct")}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleProductSubmit} className="space-y-4 mt-4">
                         <Tabs defaultValue="base" className="w-full">
-                            <TabsList className="grid w-full grid-cols-3 bg-secondary/50 rounded-xl mb-4">
-                                <TabsTrigger value="base" className="rounded-lg">Base Info</TabsTrigger>
-                                <TabsTrigger value="variants" className="rounded-lg">Variants & Add-ons</TabsTrigger>
-                                <TabsTrigger value="advanced" className="rounded-lg">Advanced & Stock</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-4 bg-secondary/50 rounded-xl mb-4 h-12">
+                                <TabsTrigger value="base" className="rounded-lg">{t("menu.baseInfo")}</TabsTrigger>
+                                <TabsTrigger value="variants" className="rounded-lg">{t("menu.variantsAddons")}</TabsTrigger>
+                                <TabsTrigger value="advanced" className="rounded-lg">{t("menu.advancedStock")}</TabsTrigger>
+                                <TabsTrigger value="availability" className="rounded-lg flex items-center gap-1.5 whitespace-nowrap">
+                                    {t("menu.availability")}
+                                    {!hasAccess && <Lock className="w-3 h-3 text-amber-500" />}
+                                </TabsTrigger>
                             </TabsList>
 
+
+
                             {/* TAB 1: BASE INFO */}
-                            <TabsContent value="base" className="space-y-4 mt-0">
+                            <TabsContent value="base" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label>Name (Arabic) *</Label>
-                                        <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl bg-secondary/50" />
+                                        <Label className="text-sm font-semibold">{t("menu.nameAr")} *</Label>
+                                        <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl h-11 bg-secondary/30 border-white/5" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Category *</Label>
+                                        <Label className="text-sm font-semibold">{t("common.category")} *</Label>
                                         <Select name="category_id" defaultValue={editingProduct?.category_id || categories[0]?.id}>
-                                            <SelectTrigger className="rounded-xl bg-secondary/50">
-                                                <SelectValue placeholder="Select category" />
+                                            <SelectTrigger className="rounded-xl h-11 bg-secondary/30 border-white/5">
+                                                <SelectValue placeholder={t("menu.selectCategory")} />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="rounded-xl border-white/5">
                                                 {categories.map((cat) => (
                                                     <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                                                 ))}
@@ -839,63 +908,68 @@ export default function MenuItemsPage() {
                                     </div>
                                 </div>
 
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label>Name (English) <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                                        <Input name="name_en" defaultValue={editingProduct?.name_en || ""} className="rounded-xl bg-secondary/50" />
+                                        <Label className="text-sm font-semibold">{t("menu.nameEn")} <span className="text-muted-foreground font-normal text-xs">({t("common.optional")})</span></Label>
+                                        <Input name="name_en" defaultValue={editingProduct?.name_en || ""} className="rounded-xl h-11 bg-secondary/30 border-white/5" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Name (Kurdish) <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                                        <Input name="name_ku" defaultValue={editingProduct?.name_ku || ""} className="rounded-xl bg-secondary/50" />
+                                        <Label className="text-sm font-semibold">{t("menu.nameKu")} <span className="text-muted-foreground font-normal text-xs">({t("common.optional")})</span></Label>
+                                        <Input name="name_ku" defaultValue={editingProduct?.name_ku || ""} className="rounded-xl h-11 bg-secondary/30 border-white/5" />
                                     </div>
                                 </div>
+
 
                                 <div className="space-y-2">
-                                    <Label>Description (Arabic)</Label>
-                                    <Textarea name="description" defaultValue={editingProduct?.description || ""} className="rounded-xl bg-secondary/50" rows={2} />
+                                    <Label className="text-sm font-semibold">{t("menu.descAr")}</Label>
+                                    <Textarea name="description" defaultValue={editingProduct?.description || ""} className="rounded-xl bg-secondary/30 border-white/5 resize-none" rows={3} />
                                 </div>
+
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label>Description (English) <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                                        <Label>{t("menu.descEn")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
                                         <Textarea name="description_en" defaultValue={editingProduct?.description_en || ""} className="rounded-xl bg-secondary/50" rows={2} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Description (Kurdish) <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                                        <Label>{t("menu.descKu")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
                                         <Textarea name="description_ku" defaultValue={editingProduct?.description_ku || ""} className="rounded-xl bg-secondary/50" rows={2} />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label>Price (د.ع) *</Label>
-                                        <Input name="price" type="number" step="1" min="0" defaultValue={editingProduct?.price} required className="rounded-xl bg-secondary/50" />
+                                        <Label className="text-sm font-semibold">{t("common.price")} ({t("storefront.currency")}) *</Label>
+                                        <Input name="price" type="number" step="1" min="0" defaultValue={editingProduct?.price} required className="rounded-xl h-11 bg-secondary/30 border-white/5" />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Image</Label>
-                                        <Input name="image" type="file" accept="image/*" className="rounded-xl bg-secondary/50 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
+                                        <Label className="text-sm font-semibold">{t("common.image")}</Label>
+                                        <Input name="image" type="file" accept="image/*" className="rounded-xl h-11 bg-secondary/30 border-white/5 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
                                     </div>
                                 </div>
+
                             </TabsContent>
 
                             {/* TAB 2: VARIANTS AND ADDONS */}
-                            <TabsContent value="variants" className="space-y-4 mt-0">
+                            <TabsContent value="variants" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
                                 {/* Variants Section */}
-                                <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-secondary/20">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label>Variants</Label>
-                                            <p className="text-xs text-muted-foreground">Different options like Size</p>
+                                <div className="space-y-3 border border-border/10 p-5 rounded-2xl bg-secondary/10">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-base font-bold text-primary">{t("menu.variants")}</Label>
+                                            <p className="text-xs text-muted-foreground/70">{t("menu.variantsDesc")}</p>
                                         </div>
+
                                         <Button type="button" variant="outline" size="sm" onClick={() => setVariants([...variants, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-8 text-xs rounded-lg">
-                                            <Plus className="w-3 h-3 mr-1" /> Add Variant
+                                            <Plus className="w-3 h-3 mr-1" /> {t("common.add")} {t("menu.variants")}
                                         </Button>
                                     </div>
                                     {variants.map((v, i) => (
                                         <div key={i} className="flex gap-2 items-center">
-                                            <Input placeholder="Name (Ar) *" value={v.name} onChange={e => { const newV = [...variants]; newV[i].name = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-32" required />
-                                            <Input placeholder="En (Optional)" value={v.name_en || ''} onChange={e => { const newV = [...variants]; newV[i].name_en = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
-                                            <Input placeholder="Ku (Optional)" value={v.name_ku || ''} onChange={e => { const newV = [...variants]; newV[i].name_ku = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
+                                            <Input placeholder={t("menu.nameAr") + " *"} value={v.name} onChange={e => { const newV = [...variants]; newV[i].name = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-32" required />
+                                            <Input placeholder={`${t("menu.nameEn")} (${t("common.optional")})`} value={v.name_en || ''} onChange={e => { const newV = [...variants]; newV[i].name_en = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
+                                            <Input placeholder={`${t("menu.nameKu")} (${t("common.optional")})`} value={v.name_ku || ''} onChange={e => { const newV = [...variants]; newV[i].name_ku = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
                                             <div className="relative w-28">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                                 <Input type="number" step="0.01" min="0" value={v.price} onChange={e => { const newV = [...variants]; newV[i].price = e.target.value; setVariants(newV); }} className="pl-7 rounded-lg bg-background" required />
@@ -910,20 +984,21 @@ export default function MenuItemsPage() {
 
                                 {/* Addons Section */}
                                 <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-secondary/20">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label>Add-ons</Label>
-                                            <p className="text-xs text-muted-foreground">Optional extras</p>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-base font-bold text-primary">{t("menu.addons")}</Label>
+                                            <p className="text-xs text-muted-foreground/70">{t("menu.addonsDesc")}</p>
                                         </div>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => setAddons([...addons, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-8 text-xs rounded-lg">
-                                            <Plus className="w-3 h-3 mr-1" /> Add Extra
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setAddons([...addons, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-9 text-xs rounded-xl border-dashed">
+                                            <Plus className="w-4 h-4 mr-1" /> {t("common.add")}
                                         </Button>
                                     </div>
+
                                     {addons.map((a, i) => (
                                         <div key={i} className="flex gap-2 items-center">
-                                            <Input placeholder="Name (Ar) *" value={a.name} onChange={e => { const newA = [...addons]; newA[i].name = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-32" required />
-                                            <Input placeholder="En (Optional)" value={a.name_en || ''} onChange={e => { const newA = [...addons]; newA[i].name_en = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
-                                            <Input placeholder="Ku (Optional)" value={a.name_ku || ''} onChange={e => { const newA = [...addons]; newA[i].name_ku = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
+                                            <Input placeholder={t("menu.nameAr") + " *"} value={a.name} onChange={e => { const newA = [...addons]; newA[i].name = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-32" required />
+                                            <Input placeholder={`${t("menu.nameEn")} (${t("common.optional")})`} value={a.name_en || ''} onChange={e => { const newA = [...addons]; newA[i].name_en = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
+                                            <Input placeholder={`${t("menu.nameKu")} (${t("common.optional")})`} value={a.name_ku || ''} onChange={e => { const newA = [...addons]; newA[i].name_ku = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
                                             <div className="relative w-28">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+$</span>
                                                 <Input type="number" step="0.01" min="0" value={a.price} onChange={e => { const newA = [...addons]; newA[i].price = e.target.value; setAddons(newA); }} className="pl-7 rounded-lg bg-background" required />
@@ -938,46 +1013,200 @@ export default function MenuItemsPage() {
                             </TabsContent>
 
                             {/* TAB 3: ADVANCED & STOCK */}
-                            <TabsContent value="advanced" className="space-y-4 mt-0">
-                                <div className="space-y-4 p-4 rounded-xl bg-secondary/20 border border-border/50">
-                                    <h4 className="font-medium text-sm border-b border-border/50 pb-2">Additional Specifications</h4>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Collection</Label>
-                                            <Input name="collection" defaultValue={editingProduct?.collection || ""} placeholder="e.g. Specials" className="rounded-xl bg-background" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Calories</Label>
-                                            <Input name="calories" type="number" min="0" defaultValue={editingProduct?.calories || ""} placeholder="kcal" className="rounded-xl bg-background" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Stock</Label>
-                                            <Input name="stock_count" type="number" min="0" defaultValue={editingProduct?.stock_count ?? ""} placeholder="∞" className="rounded-xl bg-background" />
-                                        </div>
+                            <TabsContent value="advanced" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
+                                <div className="space-y-4 p-5 rounded-2xl bg-secondary/10 border border-border/10">
+                                    <h4 className="font-bold text-sm text-primary uppercase tracking-wider">{t("menu.advancedSettings")}</h4>
+                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            {t("menu.advancedSettingsDesc") || "إعدادات إضافية للمنتج مثل الوسوم والتوفر."}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-6 p-4 rounded-xl bg-secondary/30 border border-border/50 mt-4">
+                                <div className="flex items-center gap-8 p-5 rounded-2xl bg-secondary/10 border border-border/10 mt-4">
                                     <div className="flex items-center gap-3">
-                                        <Switch name="is_available" id="available" defaultChecked={editingProduct?.is_available ?? true} />
-                                        <Label htmlFor="available">In Stock</Label>
-                                        <input type="hidden" name="is_available" value={(editingProduct?.is_available ?? true).toString()} />
+                                        <Switch 
+                                            id="available" 
+                                            defaultChecked={editingProduct?.is_available ?? true} 
+                                            onCheckedChange={(checked) => {
+                                                const el = document.getElementById('is_available_input') as HTMLInputElement;
+                                                if (el) el.value = checked.toString();
+                                            }}
+                                        />
+                                        <Label htmlFor="available" className="font-bold cursor-pointer">{t("menu.available")}</Label>
+                                        <input type="hidden" name="is_available" id="is_available_input" value={(editingProduct?.is_available ?? true).toString()} />
                                     </div>
-                                    <div className="w-px h-8 bg-border/50" />
+                                    <div className="w-px h-8 bg-border/20" />
                                     <div className="flex items-center gap-3">
-                                        <Switch name="is_hidden" id="hidden" defaultChecked={editingProduct?.is_hidden ?? false} />
-                                        <Label htmlFor="hidden">Hidden from menu</Label>
-                                        <input type="hidden" name="is_hidden" value={(editingProduct?.is_hidden ?? false).toString()} />
+                                        <Switch 
+                                            id="hidden" 
+                                            defaultChecked={editingProduct?.is_hidden ?? false} 
+                                            onCheckedChange={(checked) => {
+                                                const el = document.getElementById('is_hidden_input') as HTMLInputElement;
+                                                if (el) el.value = checked.toString();
+                                            }}
+                                        />
+                                        <Label htmlFor="hidden" className="font-bold cursor-pointer">{t("menu.hiddenFromMenu")}</Label>
+                                        <input type="hidden" name="is_hidden" id="is_hidden_input" value={(editingProduct?.is_hidden ?? false).toString()} />
                                     </div>
                                 </div>
+
+                            </TabsContent>
+
+                            {/* TAB 4: AVAILABILITY (SCHEDULING) */}
+                            <TabsContent value="availability" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
+                                {!hasAccess ? (
+                                    <div className="p-8 text-center glass-card rounded-2xl border-amber-500/20 bg-amber-500/5">
+                                        <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                                            <Lock className="w-6 h-6 text-amber-500" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-amber-600 mb-2">{t("billing.pro")}</h3>
+                                        <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+                                            {t("menu.availabilityDesc")}
+                                        </p>
+                                        <Button type="button" variant="outline" className="border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white rounded-xl">
+                                            {t("billing.upgrade")}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-3 mb-2">
+                                            <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                                            <p className="text-xs text-emerald-600 font-medium">
+                                                {t("menu.availability")}
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            {localSchedule.sort((a,b) => a.day_of_week - b.day_of_week).map((day, idx) => {
+                                                const dayNames = [
+                                                    t("common.sun"), t("common.mon"), t("common.tue"), 
+                                                    t("common.wed"), t("common.thu"), t("common.fri"), t("common.sat")
+                                                ];
+                                                return (
+                                                    <div key={idx} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${day.is_enabled ? 'bg-secondary/20 border-border/50' : 'bg-transparent border-dashed border-border/30 opacity-50'}`}>
+                                                        <Switch 
+                                                            checked={day.is_enabled} 
+                                                            onCheckedChange={() => handleToggleDay(day.day_of_week)}
+                                                            className="scale-90"
+                                                        />
+                                                        <span className="text-sm font-medium w-16">{dayNames[day.day_of_week]}</span>
+                                                        
+                                                        {day.is_enabled && (
+                                                            <div className="flex-1 flex items-center gap-4">
+                                                                <div className="flex items-center gap-2 bg-background rounded-lg p-2 border border-border/50">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="1" 
+                                                                            max="12"
+                                                                            value={format24to12(day.open_time).hour}
+                                                                            onChange={(e) => {
+                                                                                const { minute, period } = format24to12(day.open_time);
+                                                                                handleUpdateDay(day.day_of_week, 'open_time', format12to24(e.target.value, minute, period));
+                                                                            }}
+                                                                            disabled={day.is_available_all_day}
+                                                                            className="bg-secondary/20 rounded-md w-10 text-center text-xs h-7 outline-none border border-border/30"
+                                                                        />
+                                                                        <span className="text-muted-foreground">:</span>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="0" 
+                                                                            max="59"
+                                                                            value={format24to12(day.open_time).minute}
+                                                                            onChange={(e) => {
+                                                                                const { hour, period } = format24to12(day.open_time);
+                                                                                handleUpdateDay(day.day_of_week, 'open_time', format12to24(hour, e.target.value, period));
+                                                                            }}
+                                                                            disabled={day.is_available_all_day}
+                                                                            className="bg-secondary/20 rounded-md w-10 text-center text-xs h-7 outline-none border border-border/30"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={day.is_available_all_day}
+                                                                            onClick={() => {
+                                                                                const { hour, minute, period } = format24to12(day.open_time);
+                                                                                handleUpdateDay(day.day_of_week, 'open_time', format12to24(hour, minute, period === 'AM' ? 'PM' : 'AM'));
+                                                                            }}
+                                                                            className="ml-1 px-1.5 h-7 rounded-md bg-secondary/30 text-[10px] uppercase font-bold text-primary hover:bg-secondary/50 transition-colors border border-border/30"
+                                                                        >
+                                                                            {format24to12(day.open_time).period}
+                                                                        </button>
+                                                                    </div>
+                                                                    
+                                                                    <span className="text-muted-foreground">-</span>
+                                                                    
+                                                                    <div className="flex items-center gap-1">
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="1" 
+                                                                            max="12"
+                                                                            value={format24to12(day.close_time).hour}
+                                                                            onChange={(e) => {
+                                                                                const { minute, period } = format24to12(day.close_time);
+                                                                                handleUpdateDay(day.day_of_week, 'close_time', format12to24(e.target.value, minute, period));
+                                                                            }}
+                                                                            disabled={day.is_available_all_day}
+                                                                            className="bg-secondary/20 rounded-md w-10 text-center text-xs h-7 outline-none border border-border/30"
+                                                                        />
+                                                                        <span className="text-muted-foreground">:</span>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            min="0" 
+                                                                            max="59"
+                                                                            value={format24to12(day.close_time).minute}
+                                                                            onChange={(e) => {
+                                                                                const { hour, period } = format24to12(day.close_time);
+                                                                                handleUpdateDay(day.day_of_week, 'close_time', format12to24(hour, e.target.value, period));
+                                                                            }}
+                                                                            disabled={day.is_available_all_day}
+                                                                            className="bg-secondary/20 rounded-md w-10 text-center text-xs h-7 outline-none border border-border/30"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={day.is_available_all_day}
+                                                                            onClick={() => {
+                                                                                const { hour, minute, period } = format24to12(day.close_time);
+                                                                                handleUpdateDay(day.day_of_week, 'close_time', format12to24(hour, minute, period === 'AM' ? 'PM' : 'AM'));
+                                                                            }}
+                                                                            className="ml-1 px-1.5 h-7 rounded-md bg-secondary/30 text-[10px] uppercase font-bold text-primary hover:bg-secondary/50 transition-colors border border-border/30"
+                                                                        >
+                                                                            {format24to12(day.close_time).period}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-center gap-1.5 ml-auto">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        id={`all-day-${idx}`}
+                                                                        checked={day.is_available_all_day}
+                                                                        onChange={(e) => handleUpdateDay(day.day_of_week, 'is_available_all_day', e.target.checked)}
+                                                                        className="rounded border-border/50 bg-secondary/50 text-primary"
+                                                                    />
+                                                                    <Label htmlFor={`all-day-${idx}`} className="text-[10px] text-muted-foreground cursor-pointer">{t("common.allDay")}</Label>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {!day.is_enabled && (
+                                                            <span className="text-xs text-muted-foreground">{t("menu.unavailable")}</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </TabsContent>
                         </Tabs>
 
-                        <div className="pt-4 mt-4 border-t border-border/50">
-                            <Button type="submit" className="w-full gradient-emerald text-white rounded-xl h-11">
-                                {editingProduct ? "Update Item" : "Create Item"}
+
+                        <div className="pt-6 mt-6 border-t border-border/10">
+                            <Button type="submit" className="w-full gradient-emerald text-white rounded-2xl h-12 text-base font-bold shadow-lg shadow-emerald-500/20">
+                                {editingProduct ? t("common.save") : t("common.add")}
                             </Button>
                         </div>
+
                     </form>
                 </DialogContent>
             </Dialog>

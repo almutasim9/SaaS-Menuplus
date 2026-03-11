@@ -30,7 +30,7 @@ export default async function MenuPage({
             .order("sort_order", { ascending: true }),
         supabase
             .from("products")
-            .select("*, product_variants(*), product_addons(*)")
+            .select("*, product_variants(*), product_addons(*), product_availability(*)")
             .eq("restaurant_id", restaurant.id)
             .eq("is_available", true)
             .is("deleted_at", null)

@@ -12,8 +12,8 @@ const PLAN_LIMITS: Record<PlanType, { max_products: number; max_orders_per_month
 
 const PLAN_FEATURES: Record<PlanType, string[]> = {
     free: ["qr_menu", "orders", "basic_analytics"],
-    pro: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons"],
-    business: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "custom_domain", "priority_support"],
+    pro: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "product_scheduling"],
+    business: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "custom_domain", "priority_support", "product_scheduling"],
 };
 
 export async function getSubscriptionStatus(restaurantId: string) {

@@ -15,7 +15,8 @@ export async function getProducts(restaurantId: string) {
             *,
             categories(name),
             product_variants(*),
-            product_addons(*)
+            product_addons(*),
+            product_availability(*)
         `)
         .eq("restaurant_id", restaurantId)
         .is("deleted_at", null)
@@ -77,16 +78,8 @@ export async function createProduct(formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: formData.get("is_available") === "true",
             is_hidden: formData.get("is_hidden") === "true",
-            brand: formData.get("brand") || null,
-            vendor: formData.get("vendor") || null,
-            collection: formData.get("collection") || null,
-            tags: formData.get("tags") ? (formData.get("tags") as string).split(',').map(t => t.trim()).filter(Boolean) : null,
-            calories: formData.get("calories") ? parseInt(formData.get("calories") as string) : null,
-            prep_time_minutes: formData.get("prep_time_minutes") ? parseInt(formData.get("prep_time_minutes") as string) : null,
-            stock_count: formData.get("stock_count") && formData.get("stock_count") !== "" ? parseInt(formData.get("stock_count") as string) : null,
             variants: variantsJson ? JSON.parse(variantsJson) : undefined,
             addons: addonsJson ? JSON.parse(addonsJson) : undefined,
-            // image_url is handled later
         };
 
         const validatedData = productSchema.parse(rawData);
@@ -126,13 +119,6 @@ export async function createProduct(formData: FormData) {
                 compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
                 is_available: validatedData.is_available,
                 is_hidden: validatedData.is_hidden,
-                brand: validatedData.brand,
-                vendor: validatedData.vendor,
-                collection: validatedData.collection,
-                tags: validatedData.tags,
-                calories: validatedData.calories,
-                prep_time_minutes: validatedData.prep_time_minutes,
-                stock_count: validatedData.stock_count,
                 image_url: imageUrl,
             })
             .select()
@@ -198,13 +184,6 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: formData.get("is_available") === "true",
             is_hidden: formData.get("is_hidden") === "true",
-            brand: formData.get("brand") || null,
-            vendor: formData.get("vendor") || null,
-            collection: formData.get("collection") || null,
-            tags: formData.get("tags") ? (formData.get("tags") as string).split(',').map(t => t.trim()).filter(Boolean) : null,
-            calories: formData.get("calories") ? parseInt(formData.get("calories") as string) : null,
-            prep_time_minutes: formData.get("prep_time_minutes") ? parseInt(formData.get("prep_time_minutes") as string) : null,
-            stock_count: formData.get("stock_count") && formData.get("stock_count") !== "" ? parseInt(formData.get("stock_count") as string) : null,
             variants: variantsJson ? JSON.parse(variantsJson) : undefined,
             addons: addonsJson ? JSON.parse(addonsJson) : undefined,
         };
@@ -226,13 +205,6 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: validatedData.is_available,
             is_hidden: validatedData.is_hidden,
-            brand: validatedData.brand,
-            vendor: validatedData.vendor,
-            collection: validatedData.collection,
-            tags: validatedData.tags,
-            calories: validatedData.calories,
-            prep_time_minutes: validatedData.prep_time_minutes,
-            stock_count: validatedData.stock_count,
         };
 
         if (imageFile && imageFile.size > 0) {
@@ -453,4 +425,48 @@ export async function incrementProductView(productId: string) {
         console.error("[incrementProductView error]", e);
         // Silently fail to avoid breaking UX for a non-critical analytics tracker
     }
+}
+
+export async function getProductAvailability(productId: string) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from("product_availability")
+        .select("*")
+        .eq("product_id", productId)
+        .order("day_of_week", { ascending: true });
+
+    if (error) throw error;
+    return data;
+}
+
+export async function updateProductAvailability(productId: string, availabilityData: any[]) {
+    const supabase = await createClient();
+    
+    // Check if the user owns the product (handled by RLS but good for double-check or custom error)
+    
+    // Delete existing availability
+    const { error: deleteError } = await supabase
+        .from("product_availability")
+        .delete()
+        .eq("product_id", productId);
+    
+    if (deleteError) throw deleteError;
+
+    if (availabilityData.length > 0) {
+        const { error: insertError } = await supabase
+            .from("product_availability")
+            .insert(availabilityData.map(item => ({
+                product_id: productId,
+                day_of_week: item.day_of_week,
+                open_time: item.open_time,
+                close_time: item.close_time,
+                is_available_all_day: item.is_available_all_day,
+                is_enabled: item.is_enabled ?? true
+            })));
+        
+        if (insertError) throw insertError;
+    }
+
+    revalidatePath("/dashboard/menu");
+    return { success: true };
 }

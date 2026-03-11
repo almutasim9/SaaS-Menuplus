@@ -9,6 +9,10 @@ import { ProductCustomizationModal } from "./ProductCustomizationModal";
 import type { ProductWithCustomization } from "@/lib/types/database.types";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n/context";
+import { isProductCurrentlyAvailable } from "@/lib/utils/availability";
+import { Clock } from "lucide-react";
+import { format24to12String } from "@/lib/time-utils";
+
 
 interface MenuItemCardProps {
     product: ProductWithCustomization;
@@ -33,7 +37,7 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
 
     const handleAddClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (product.stock_count === 0) return; // Prevent if out of stock
+        if (isCurrentlyUnavailable) return; // Prevent if out of stock or scheduled away
 
         if (hasOptions) {
             setIsModalOpen(true);
@@ -58,13 +62,18 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
 
     const isOutOfStock = !product.is_available || product.stock_count === 0;
 
+    const { isAvailable: isScheduledAvailable, nextOpening } = isProductCurrentlyAvailable(product.product_availability as any);
+    const isCurrentlyUnavailable = isOutOfStock || !isScheduledAvailable;
+
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.05 }}
-            className={`flex ${isListLayout ? "flex-row h-28 items-center p-3 gap-3" : "flex-col p-2.5 h-auto"} rounded-[2rem] ${isDark ? "bg-[#141414] border-gray-800" : "bg-white border-gray-50"} border shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${isOutOfStock ? "opacity-60 grayscale cursor-not-allowed" : "hover:shadow-lg transition-transform hover:-translate-y-1 duration-300 cursor-pointer"} relative group overflow-hidden`}
-            onClick={() => { if (hasOptions && !isOutOfStock) setIsModalOpen(true) }}
+            className={`flex ${isListLayout ? "flex-row h-28 items-center p-3 gap-3" : "flex-col p-2.5 h-auto"} rounded-[2rem] ${isDark ? "bg-[#141414] border-gray-800" : "bg-white border-gray-50"} border shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${isCurrentlyUnavailable ? "opacity-60 grayscale cursor-not-allowed" : "hover:shadow-lg transition-transform hover:-translate-y-1 duration-300 cursor-pointer"} relative group overflow-hidden`}
+            onClick={() => { if (hasOptions && !isCurrentlyUnavailable) setIsModalOpen(true) }}
+
         >
             {/* Image Section - Takes top space in Grid */}
             <div className={`relative ${isListLayout ? "w-20 h-20 shrink-0" : "aspect-square w-full"} rounded-3xl overflow-hidden ${isDark ? "bg-[#2a2a2a]" : "bg-gray-100/70"} flex items-center justify-center`} style={hasImage || isDark ? undefined : { backgroundColor: 'var(--primary)05' }}>
@@ -109,7 +118,7 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                     </div>
 
                     {/* Add Button OR Out of Stock Badge */}
-                    {!isOutOfStock ? (
+                    {!isCurrentlyUnavailable ? (
                         <div className="mr-auto self-end flex items-center justify-center">
                             <button
                                 onClick={handleAddClick}
@@ -120,12 +129,20 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                             </button>
                         </div>
                     ) : (
-                        <div className={`self-end ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'}`}>
-                            <Badge variant="destructive" className="bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-0 h-6 text-[10px] border-none">
-                                {t("menu.unavailable")}
-                            </Badge>
+                        <div className={`self-end ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} flex flex-col items-end gap-1`}>
+                            {!isScheduledAvailable && !isOutOfStock ? (
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-2 py-0 h-6 text-[9px] flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5" />
+                                    {nextOpening ? `يتوفر الساعة ${format24to12String(nextOpening)}` : "غير متوفر حالياً"}
+                                </Badge>
+                            ) : (
+                                <Badge variant="destructive" className="bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-0 h-6 text-[10px] border-none">
+                                    {t("menu.unavailable")}
+                                </Badge>
+                            )}
                         </div>
                     )}
+
                 </div>
             </div>
 
