@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { getNotifications, type Notification } from "@/lib/actions/notifications";
+import { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useNotifications } from "@/lib/hooks/useNotifications";
 import {
     Bell,
     AlertTriangle,
@@ -31,22 +30,10 @@ const typeConfig = {
 
 export function NotificationBell() {
     const { t, dir } = useTranslation();
-    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [open, setOpen] = useState(false);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-    useEffect(() => {
-        async function load() {
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            const { data: profile } = await supabase.from("profiles").select("restaurant_id").eq("id", user.id).single();
-            if (!profile?.restaurant_id) return;
-            const notifs = await getNotifications(profile.restaurant_id);
-            setNotifications(notifs);
-        }
-        load();
-    }, []);
+    const { data: notifications = [] } = useNotifications();
 
     const visible = notifications.filter(n => !dismissed.has(n.id));
     const unreadCount = visible.length;
