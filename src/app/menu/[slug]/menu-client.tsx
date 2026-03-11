@@ -53,11 +53,27 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                     product_addons (*)
                 `)
                 .eq('restaurant_id', restaurant.id)
+                .eq('is_available', true)
+                .is('deleted_at', null)
                 .order('created_at', { ascending: false });
             return (data || []) as ProductWithCustomization[];
         },
         initialData: initialProducts,
     });
+
+    if (restaurant.subscription_status === "expired") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background p-4 text-center">
+                <div className="max-w-md space-y-4">
+                    <div className="p-4 rounded-full bg-destructive/10 w-16 h-16 flex items-center justify-center mx-auto">
+                        <Bell className="w-8 h-8 text-destructive" />
+                    </div>
+                    <h2 className="text-2xl font-bold">{t("storefront.subscriptionExpired")}</h2>
+                    <p className="text-muted-foreground">{restaurant.name}</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);

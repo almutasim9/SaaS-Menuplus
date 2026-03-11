@@ -210,6 +210,7 @@
         "products": "المنتجات",
         "noProductsTitle": "لم يتم العثور على منتجات",
         "noProductsDesc": "حاول البحث بكلمة مختلفة",
+        "subscriptionExpired": "نعتذر، المنيو غير متاح حالياً بسبب انتهاء فترة الاشتراك.",
         "viewCart": "عرض السلة",
         "currency": "د.ع",
         "checkout": {

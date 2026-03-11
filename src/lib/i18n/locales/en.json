@@ -210,6 +210,7 @@
         "products": "Products",
         "noProductsTitle": "No products found",
         "noProductsDesc": "Try searching with a different keyword",
+        "subscriptionExpired": "We're sorry, the menu is currently unavailable due to an expired subscription.",
         "viewCart": "View Cart",
         "currency": "IQD",
         "checkout": {

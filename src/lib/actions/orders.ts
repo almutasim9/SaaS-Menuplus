@@ -1,10 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { createOrderSchema } from "@/lib/validations/schemas";
 import { z } from "zod";
 import { checkLimitAccess } from "@/lib/actions/subscription";
+import { headers } from "next/headers";
 
 export async function getOrders(restaurantId: string) {
     const supabase = await createClient();
@@ -22,6 +23,14 @@ export async function getOrders(restaurantId: string) {
 export async function createOrder(orderData: any) {
     try {
         const validatedData = createOrderSchema.parse(orderData);
+        const headersList = await headers();
+        const clientIp = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
+
+        // Add client_ip to payload
+        const payloadToInsert = {
+            ...validatedData,
+            client_ip: clientIp !== 'unknown' ? clientIp : null
+        };
 
         // --- Feature Gating: Check order limit ---
         const limit = await checkLimitAccess(validatedData.restaurant_id, "orders");
@@ -30,16 +39,32 @@ export async function createOrder(orderData: any) {
         }
         // --- End Feature Gating ---
 
-        const supabase = await createClient();
+        const adminClient = createAdminClient();
 
         // ----------------------------------------------------
-        // Rate Limiting (Spam Prevention)
+        // Rate Limiting (Spam Prevention) Disable for testing:
         // ----------------------------------------------------
-        if (validatedData.customer_phone) {
-            // Check if there's an order with the same phone in the last 2 minutes
+        /* 
+        // 1. IP Based (Max 5 orders per 15 mins)
+        if (clientIp !== 'unknown') {
+            const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+            const { count, error: ipCountError } = await adminClient
+                .from("orders")
+                .select("*", { count: 'exact', head: true })
+                .eq("restaurant_id", validatedData.restaurant_id)
+                .eq("client_ip", clientIp)
+                .gte("created_at", fifteenMinsAgo);
+
+            if (!ipCountError && count && count >= 5) {
+                throw new Error("لقد تجاوزت الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.");
+            }
+        }
+
+        // 2. Phone Based (Max 2 orders per 2 minutes)
+        if (validatedData.customer_phone && validatedData.customer_phone !== "N/A" && validatedData.customer_phone.trim() !== "") {
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
-            const { count, error: countError } = await supabase
+            const { count, error: countError } = await adminClient
                 .from("orders")
                 .select("*", { count: 'exact', head: true })
                 .eq("restaurant_id", validatedData.restaurant_id)
@@ -50,11 +75,12 @@ export async function createOrder(orderData: any) {
                 throw new Error("عذراً، لقد قمت بإرسال طلبات كثيرة. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى.");
             }
         }
+        */
         // ----------------------------------------------------
 
-        const { data, error } = await supabase
+        const { data, error } = await adminClient
             .from("orders")
-            .insert(validatedData)
+            .insert(payloadToInsert)
             .select()
             .single();
 
@@ -74,7 +100,7 @@ export async function createOrder(orderData: any) {
                 }
             }));
 
-            const { error: itemsError } = await supabase
+            const { error: itemsError } = await adminClient
                 .from("order_items")
                 .insert(orderItemsInsert);
 
@@ -87,7 +113,7 @@ export async function createOrder(orderData: any) {
             // Decrement Stock for each item using the RPC
             for (const item of validatedData.items) {
                 if (item.id) {
-                    const { error: stockError } = await supabase.rpc("decrement_stock", {
+                    const { error: stockError } = await adminClient.rpc("decrement_stock", {
                         p_product_id: item.id,
                         p_quantity: item.quantity
                     });
@@ -103,7 +129,7 @@ export async function createOrder(orderData: any) {
 
         // Increment coupon usage using the atomic RPC
         if (orderData.coupon_code) {
-            const { error: rpcError } = await supabase.rpc("apply_coupon_transaction", {
+            const { error: rpcError } = await adminClient.rpc("apply_coupon_transaction", {
                 p_coupon_code: orderData.coupon_code,
                 p_restaurant_id: orderData.restaurant_id
             });

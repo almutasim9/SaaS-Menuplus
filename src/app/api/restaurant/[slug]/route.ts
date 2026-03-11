@@ -44,5 +44,27 @@ export async function GET(
         return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
 
-    return NextResponse.json(restaurant);
+    // Fetch categories and products for full menu (useful for Flutter/PWA)
+    const [categoriesRes, productsRes] = await Promise.all([
+        supabase
+            .from("categories")
+            .select("*")
+            .eq("restaurant_id", restaurant.id)
+            .eq("is_hidden", false)
+            .is("deleted_at", null)
+            .order("sort_order", { ascending: true }),
+        supabase
+            .from("products")
+            .select("*, product_variants(*), product_addons(*)")
+            .eq("restaurant_id", restaurant.id)
+            .eq("is_available", true)
+            .is("deleted_at", null)
+            .order("created_at", { ascending: false }),
+    ]);
+
+    return NextResponse.json({
+        ...restaurant,
+        categories: categoriesRes.data || [],
+        products: productsRes.data || []
+    });
 }

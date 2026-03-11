@@ -123,10 +123,17 @@ export async function getProfile() {
     return profile;
 }
 
+import { headers } from "next/headers";
+
 export async function forgotPassword(email: string) {
+    const headerList = await headers();
+    const host = headerList.get("host");
+    const protocol = headerList.get("x-forwarded-proto") || "http";
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
+
     const supabase = await createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback?next=/reset-password`,
+        redirectTo: `${baseUrl}/auth/callback?next=/reset-password`,
     });
 
     if (error) {
