@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { updateOrderStatus } from "@/lib/actions/orders";
+import { updateOrderStatus, getOrders } from "@/lib/actions/orders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,13 +88,13 @@ export default function OrderHistoryPage() {
 
         if (!profile?.restaurant_id) return;
 
-        const { data } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("restaurant_id", profile.restaurant_id)
-            .order("created_at", { ascending: false });
-
-        setOrders((data as Order[]) || []);
+        try {
+            const data = await getOrders(profile.restaurant_id);
+            setOrders((data as Order[]) || []);
+        } catch (error) {
+            console.error("Failed to fetch orders", error);
+            toast.error("Failed to load orders");
+        }
         setLoading(false);
     }, []);
 

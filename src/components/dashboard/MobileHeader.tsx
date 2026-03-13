@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function MobileHeader() {
     const [restaurantName, setRestaurantName] = useState<string>("");
@@ -51,7 +52,10 @@ export function MobileHeader() {
                 <p className="text-[11px] text-gray-500 font-medium">{greeting} 👋</p>
                 <h1 className="text-sm font-bold truncate">{restaurantName || "MenuPlus"}</h1>
             </div>
-            <NotificationBell />
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <NotificationBell />
+            </div>
         </div>
     );
 }

@@ -12,12 +12,23 @@ export async function getOrders(restaurantId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select("*, order_items(*)")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return data;
+
+    // Map order_items to items field for compatibility with existing components
+    return data.map(order => ({
+        ...order,
+        items: (order.order_items as any[] || []).map(item => ({
+            id: item.product_id,
+            name: item.item_name,
+            price: item.unit_price,
+            quantity: item.quantity,
+            ...(item.variant_details || {}) // Spread variant/addons if they exist
+        }))
+    }));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

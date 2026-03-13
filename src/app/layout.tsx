@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "MenuPlus — Restaurant Management Platform",
-  description: "Modern digital menu and restaurant management SaaS platform",
+  description: "Modern digital menu and restaurant management platform",
 };
 
 export default async function RootLayout({
