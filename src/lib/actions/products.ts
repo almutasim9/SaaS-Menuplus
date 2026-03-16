@@ -6,6 +6,8 @@ import { productSchema } from "@/lib/validations/schemas";
 import { z } from "zod";
 import type { Product } from "@/lib/types/database.types";
 import { checkLimitAccess } from "@/lib/actions/subscription";
+import { requireRestaurantOwnership, requireAuth } from "@/lib/actions/_auth-guard";
+import { validateImageFile } from "@/lib/utils/file-validation";
 
 export async function getProducts(restaurantId: string) {
     const supabase = await createClient();
@@ -52,8 +54,12 @@ export async function getProductsByCategory(restaurantId: string, categoryId: st
 
 export async function createProduct(formData: FormData) {
     try {
-        // --- Feature Gating: Check product limit ---
         const restaurantId = formData.get("restaurant_id") as string;
+
+        // Auth + Ownership check
+        await requireRestaurantOwnership(restaurantId);
+
+        // --- Feature Gating: Check product limit ---
         if (restaurantId) {
             const limit = await checkLimitAccess(restaurantId, "products");
             if (!limit.allowed) {
@@ -84,6 +90,11 @@ export async function createProduct(formData: FormData) {
 
         const validatedData = productSchema.parse(rawData);
         const imageFile = formData.get("image") as File | null;
+
+        // File type validation
+        if (imageFile && imageFile.size > 0) {
+            validateImageFile(imageFile, "صورة المنتج");
+        }
 
         const supabase = await createClient();
 
@@ -119,6 +130,9 @@ export async function createProduct(formData: FormData) {
                 compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
                 is_available: validatedData.is_available,
                 is_hidden: validatedData.is_hidden,
+                stock_count: validatedData.stock_count,
+                calories: validatedData.calories,
+                prep_time_minutes: validatedData.prep_time_minutes,
                 image_url: imageUrl,
             })
             .select()
@@ -168,6 +182,9 @@ export async function createProduct(formData: FormData) {
 
 export async function updateProduct(id: string, formData: FormData) {
     try {
+        const restaurantId = formData.get("restaurant_id") as string;
+        await requireRestaurantOwnership(restaurantId);
+
         const variantsJson = formData.get("variants") as string;
         const addonsJson = formData.get("addons") as string;
 
@@ -184,12 +201,20 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: formData.get("is_available") === "true",
             is_hidden: formData.get("is_hidden") === "true",
+            stock_count: formData.get("stock_count") ? parseInt(formData.get("stock_count") as string) : null,
+            calories: formData.get("calories") ? parseInt(formData.get("calories") as string) : null,
+            prep_time_minutes: formData.get("prep_time_minutes") ? parseInt(formData.get("prep_time_minutes") as string) : null,
             variants: variantsJson ? JSON.parse(variantsJson) : undefined,
             addons: addonsJson ? JSON.parse(addonsJson) : undefined,
         };
 
         const validatedData = productSchema.parse(rawData);
         const imageFile = formData.get("image") as File | null;
+
+        // File type validation
+        if (imageFile && imageFile.size > 0) {
+            validateImageFile(imageFile, "صورة المنتج");
+        }
 
         const supabase = await createClient();
 
@@ -205,6 +230,9 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: validatedData.is_available,
             is_hidden: validatedData.is_hidden,
+            stock_count: validatedData.stock_count,
+            calories: validatedData.calories,
+            prep_time_minutes: validatedData.prep_time_minutes,
         };
 
         if (imageFile && imageFile.size > 0) {
@@ -275,8 +303,9 @@ export async function updateProduct(id: string, formData: FormData) {
 
 export async function updateProductDiscount(id: string, compareAtPrice: number | null, isDiscountActive: boolean) {
     try {
-        const supabase = await createClient();
+        const { supabase } = await requireAuth();
 
+        // Verify product belongs to user's restaurant (RLS enforces this via user session)
         const { data, error } = await supabase
             .from("products")
             .update({
@@ -302,7 +331,7 @@ export async function updateProductDiscount(id: string, compareAtPrice: number |
 
 export async function duplicateProduct(id: string) {
     try {
-        const supabase = await createClient();
+        const { supabase } = await requireAuth();
 
         // 1. Fetch original product with relations
         const { data: original, error: fetchError } = await supabase
@@ -365,7 +394,7 @@ export async function duplicateProduct(id: string) {
 }
 
 export async function deleteProduct(id: string) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const { error } = await supabase
         .from("products")
         .update({ deleted_at: new Date().toISOString() } as any)
@@ -375,7 +404,7 @@ export async function deleteProduct(id: string) {
 }
 
 export async function toggleProductAvailability(id: string, isAvailable: boolean) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const { error } = await supabase
         .from("products")
         .update({ is_available: isAvailable })
@@ -385,7 +414,7 @@ export async function toggleProductAvailability(id: string, isAvailable: boolean
 }
 
 export async function toggleProductVisibility(id: string, isHidden: boolean) {
-    const supabase = await createClient();
+    const { supabase } = await requireAuth();
     const { error } = await supabase
         .from("products")
         .update({ is_hidden: isHidden })
@@ -440,9 +469,7 @@ export async function getProductAvailability(productId: string) {
 }
 
 export async function updateProductAvailability(productId: string, availabilityData: any[]) {
-    const supabase = await createClient();
-    
-    // Check if the user owns the product (handled by RLS but good for double-check or custom error)
+    const { supabase } = await requireAuth();
     
     // Delete existing availability
     const { error: deleteError } = await supabase

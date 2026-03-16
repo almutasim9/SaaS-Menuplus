@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useCreateDeliveryZoneMutation, useUpdateDeliveryZoneMutation, type ZoneWithAreas } from "@/lib/hooks/useDeliveryZones";
+import { arabicToEnglishNumbers } from "@/lib/utils";
 
 interface ZoneFormModalProps {
     open: boolean;
@@ -24,6 +25,8 @@ export function ZoneFormModal({ open, onOpenChange, restaurantId, editingZone }:
     const [zoneName, setZoneName] = useState("");
     const [flatRate, setFlatRate] = useState("");
     const [freeThreshold, setFreeThreshold] = useState("");
+    const [estimatedTime, setEstimatedTime] = useState("");
+    const [minOrder, setMinOrder] = useState("");
 
     const createMutation = useCreateDeliveryZoneMutation();
     const updateMutation = useUpdateDeliveryZoneMutation();
@@ -34,10 +37,14 @@ export function ZoneFormModal({ open, onOpenChange, restaurantId, editingZone }:
                 setZoneName(editingZone.zone_name);
                 setFlatRate(editingZone.flat_rate.toString());
                 setFreeThreshold(editingZone.free_delivery_threshold?.toString() || "");
+                setEstimatedTime(editingZone.estimated_delivery_time || "");
+                setMinOrder(editingZone.min_order_amount?.toString() || "");
             } else {
                 setZoneName("");
                 setFlatRate("");
                 setFreeThreshold("");
+                setEstimatedTime("");
+                setMinOrder("");
             }
         }
     }, [open, editingZone]);
@@ -52,6 +59,8 @@ export function ZoneFormModal({ open, onOpenChange, restaurantId, editingZone }:
                     zoneName,
                     flatRate: parseFloat(flatRate) || 0,
                     freeThreshold: freeThreshold ? parseFloat(freeThreshold) : undefined,
+                    estimatedDeliveryTime: estimatedTime,
+                    minOrderAmount: parseFloat(minOrder) || 0,
                     isActive: editingZone.is_active
                 });
                 toast.success("تم تحديث المنطقة بنجاح");
@@ -60,7 +69,9 @@ export function ZoneFormModal({ open, onOpenChange, restaurantId, editingZone }:
                     restaurantId,
                     zoneName,
                     flatRate: parseFloat(flatRate) || 0,
-                    freeThreshold: freeThreshold ? parseFloat(freeThreshold) : undefined
+                    freeThreshold: freeThreshold ? parseFloat(freeThreshold) : undefined,
+                    estimatedDeliveryTime: estimatedTime,
+                    minOrderAmount: parseFloat(minOrder) || 0
                 });
                 toast.success("تمت إضافة المنطقة بنجاح");
             }
@@ -84,12 +95,23 @@ export function ZoneFormModal({ open, onOpenChange, restaurantId, editingZone }:
                     </div>
                     <div className="space-y-2">
                         <Label>سعر التوصيل (Flat Rate د.ع)</Label>
-                        <Input type="number" step="0.01" value={flatRate} onChange={(e) => setFlatRate(e.target.value)} placeholder="5000" className="rounded-xl bg-secondary/50" />
+                        <Input type="text" value={flatRate} onChange={(e) => setFlatRate(arabicToEnglishNumbers(e.target.value))} placeholder="5000" className="rounded-xl bg-secondary/50" />
                     </div>
                     <div className="space-y-2">
                         <Label>الحد الأدنى للتوصيل المجاني (Free Threshold د.ع)</Label>
-                        <Input type="number" step="0.01" value={freeThreshold} onChange={(e) => setFreeThreshold(e.target.value)} placeholder="اختياري (Optional)" className="rounded-xl bg-secondary/50" />
+                        <Input type="text" value={freeThreshold} onChange={(e) => setFreeThreshold(arabicToEnglishNumbers(e.target.value))} placeholder="اختياري (Optional)" className="rounded-xl bg-secondary/50" />
                         <p className="text-xs text-muted-foreground">اتركه فارغاً إذا لم يكن هناك خيار توصيل مجاني</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>الحد الأدنى للطلب لهذا الزون (Min Order د.ع)</Label>
+                        <Input type="text" value={minOrder} onChange={(e) => setMinOrder(arabicToEnglishNumbers(e.target.value))} placeholder="مثال: 10000" className="rounded-xl bg-secondary/50" />
+                        <p className="text-xs text-muted-foreground">لن يتمكن الزبون من الطلب إذا كان المجموع أقل من هذا المبلغ</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>وقت التوصيل المتوقع (Delivery Time)</Label>
+                        <Input value={estimatedTime} onChange={(e) => setEstimatedTime(e.target.value)} placeholder="مثال: 45-60 دقيقة" className="rounded-xl bg-secondary/50" />
                     </div>
                     <Button 
                         onClick={handleSave} 

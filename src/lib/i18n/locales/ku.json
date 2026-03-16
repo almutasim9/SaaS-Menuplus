@@ -39,7 +39,8 @@
         "wed": "چوارشەممە",
         "thu": "پێنجشەممە",
         "fri": "هەینی",
-        "sat": "شەممە"
+        "sat": "شەممە",
+        "category": "پۆل"
     },
     "sidebar": {
         "dashboard": "داشبۆرد",
@@ -52,7 +53,9 @@
         "delivery": "گەیاندن",
         "discounts": "داشکاندنەکان",
         "billing": "پارەدانەکان",
+        "support": "پشتگیری",
         "settings": "ڕێکخستنەکان",
+        "locations": "گەڕەک و ناوچەکان",
         "logout": "چوونەدەرەوە"
     },
     "dashboard": {
@@ -96,7 +99,20 @@
         "ofTotal": "لە کۆی گشتی",
         "visitsLast7": "سەردانەکان (دوا 7 ڕۆژ)",
         "qrCode": "QR Code",
-        "directLink": "لینکی ڕاستەوخۆ"
+        "directLink": "لینکی ڕاستەوخۆ",
+        "last7Days": "Last 7 Days",
+        "last30Days": "Last 30 Days",
+        "customRange": "Custom Range",
+        "filterRange": "Filter Range",
+        "selectRange": "Select Range",
+        "from": "From Date",
+        "to": "To Date",
+        "today": "Today",
+        "visitsTrend": "Visits Trend",
+        "revenueTrend": "Revenue Trend",
+        "ordersTrend": "Orders Trend",
+        "revenue": "Revenue",
+        "orders": "Orders"
     },
     "notifications": {
         "title": "ئاگاداریەکان",
@@ -138,7 +154,7 @@
         "productName": "ناوی بەرهەم",
         "noCategories": "هیچ پۆلێک نییە",
         "noProducts": "هیچ بەرهەمێک نییە",
-        "available": "بەردەستە",
+        "available": "بەردەستە بۆ داواکاری",
         "unavailable": "بەردەست نییە",
         "hidden": "شاراوەتەوە",
         "allItems": "هەموو بابەتەکان",
@@ -175,7 +191,14 @@
         "hiddenItems": "بابەتە شاراوەکان",
         "discountedItems": "بابەتە داشکاوەکان",
         "menuEmpty": "لیستەی خۆراک بەتاڵە",
-        "createCategoryToStart": "یەکەم پۆل دروست بکە بۆ دەستپێکردن بە زیادکردنی بەرهەمەکان"
+        "createCategoryToStart": "یەکەم پۆل دروست بکە بۆ دەستپێکردن بە زیادکردنی بەرهەمەکان",
+        "showTranslations": "زیادکردنی زمانەکانی تر (ئینگلیزی / کوردی)",
+        "translations": "زمانەکان و وەرگێڕان",
+        "mustSelectOne": "دەبێت دانەیەک هەڵبژێریت (پێویستە)",
+        "optionalAddons": "زیادکراوە ئارەزوومەندانەکان",
+        "prepTime": "کاتی ئامادەکردن (خولەک)",
+        "advancedSettings": "ڕێکخستنە پێشکەوتووەکان",
+        "advancedSettingsDesc": "کۆنتڕۆڵی بەردەستبوونی بەرهەم و کۆگا و وردەکارییە زیادەکان بکە."
     },
     "orders": {
         "activeOrders": "داواکارییە چالاکەکان",
@@ -211,6 +234,8 @@
     },
     "appearance": {
         "title": "دەرکەوتن",
+        "subtitle": "Customize how your menu looks to your customers",
+        "imagery": "Logos & Imagery",
         "primaryColor": "ڕەنگی سەرەکی",
         "logo": "لۆگۆ",
         "banner": "بانەر",
@@ -261,6 +286,8 @@
         "subscriptionExpired": "ببوورن، مینووەکە ئێستا بەردەست نییە بەهۆی کۆتایی هاتنی ماوەی بەشداری کردن.",
         "viewCart": "پیشاندانی سەبەتە",
         "currency": "د.ع",
+        "startsFrom": "دەستپێدەکات لە",
+        "selectOptionMessage": "تکایە یەکێک لە بژاردەکان هەڵبژێرە بۆ بەردەوام بوون",
         "checkout": {
             "orderPlaced": "داواکاری پشتڕاستکرایەوە!",
             "orderReceived": "داواکارییەکەت وەرگیرا. بەمزوانە دەست بە ئامادەکردنی دەکەین.",
@@ -307,6 +334,7 @@
                 "placeholder": "کۆدی داشکاندن بنووسە",
                 "apply": "چەسپاندن",
                 "success": "کۆدی داشکاندن چەسپا! تۆ {{discount}} ت پاشەکەوت کرد",
+                "freeDeliveryApplied": "کۆپۆنی گەیاندنی بێبەرامبەر کارا کرا!",
                 "invalid": "کۆدی داشکاندن هەڵەیە"
             },
             "summary": {

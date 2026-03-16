@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -15,12 +14,27 @@ import {
     LogOut,
     ChevronRight,
     UtensilsCrossed,
+    MapPin,
+    ClipboardList,
+    HeadphonesIcon,
+    CalendarClock,
+    Puzzle,
+    DollarSign,
+    Star,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
+import { GlobalSearch } from "@/components/admin/GlobalSearch";
 
 const adminNavItems = [
-    { href: "/admin", label: "Platform Overview", icon: LayoutDashboard },
-    { href: "/admin/restaurants", label: "All Restaurants", icon: Store },
+    { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
+    { href: "/admin/restaurants", label: "المطاعم", icon: Store },
+    { href: "/admin/onboarding", label: "متابعة الإعداد", icon: ClipboardList },
+    { href: "/admin/subscriptions", label: "الاشتراكات", icon: CalendarClock },
+    { href: "/admin/addons", label: "الإضافات", icon: Puzzle },
+    { href: "/admin/revenue", label: "الإيرادات", icon: DollarSign },
+    { href: "/admin/early-adopters", label: "الروّاد الأوائل", icon: Star },
+    { href: "/admin/locations", label: "إدارة المواقع", icon: MapPin },
+    { href: "/admin/support", label: "الدعم الفني", icon: HeadphonesIcon },
 ];
 
 function AdminSidebarContent({ pathname }: { pathname: string }) {
@@ -33,8 +47,8 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
                         <Shield className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <span className="text-xl font-bold bg-gradient-to-r from-red-400 to-red-300 bg-clip-text text-transparent">Admin</span>
-                        <p className="text-[10px] text-muted-foreground -mt-0.5">Super Admin Panel</p>
+                        <span className="text-xl font-bold bg-gradient-to-r from-red-400 to-red-300 bg-clip-text text-transparent">لوحة الأدمن</span>
+                        <p className="text-[10px] text-muted-foreground -mt-0.5">إدارة المنصة</p>
                     </div>
                 </div>
             </div>
@@ -44,7 +58,7 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
             {/* Navigation */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                 {adminNavItems.map((item) => {
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
                     return (
                         <Link
                             key={item.href}
@@ -57,8 +71,8 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
                                 }
                             `}
                         >
-                            <item.icon className="w-5 h-5" />
-                            {item.label}
+                            <item.icon className="w-5 h-5 shrink-0" />
+                            <span className="flex-1">{item.label}</span>
                             {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
                         </Link>
                     );
@@ -68,13 +82,16 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
             <Separator className="opacity-50" />
 
             {/* Footer */}
-            <div className="p-4 space-y-1">
+            <div className="p-4 space-y-2">
+                <div className="px-1">
+                    <GlobalSearch />
+                </div>
                 <Link
                     href="/dashboard"
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200"
                 >
                     <UtensilsCrossed className="w-5 h-5" />
-                    Back to Dashboard
+                    لوحة تحكم المطعم
                 </Link>
                 <form action={signOut}>
                     <Button
@@ -83,7 +100,7 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
                         className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
                     >
                         <LogOut className="w-5 h-5" />
-                        Sign Out
+                        تسجيل الخروج
                     </Button>
                 </form>
             </div>
@@ -110,15 +127,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <Menu className="w-5 h-5" />
                         </Button>
                     </SheetTrigger>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1">
                         <div className="p-1.5 rounded-lg bg-gradient-to-br from-red-500 to-red-600">
                             <Shield className="w-4 h-4 text-white" />
                         </div>
-                        <span className="font-semibold bg-gradient-to-r from-red-400 to-red-300 bg-clip-text text-transparent">Admin Panel</span>
+                        <span className="font-semibold bg-gradient-to-r from-red-400 to-red-300 bg-clip-text text-transparent">لوحة الأدمن</span>
                     </div>
+                    <GlobalSearch />
                 </div>
                 <SheetContent side="left" className="w-72 p-0 glass-card border-border/50 flex flex-col h-full">
-                    <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
+                    <SheetTitle className="sr-only">قائمة الأدمن</SheetTitle>
                     <div className="flex-1 overflow-y-auto">
                         <AdminSidebarContent pathname={pathname} />
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import {
@@ -32,11 +32,24 @@ export function NotificationBell() {
     const { t, dir } = useTranslation();
     const [open, setOpen] = useState(false);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const { data: notifications = [] } = useNotifications();
 
     const visible = notifications.filter(n => !dismissed.has(n.id));
     const unreadCount = visible.length;
+
+    if (!mounted) {
+        return (
+            <button className="relative p-2 rounded-xl hover:bg-secondary/50 transition-colors">
+                <Bell className="w-5 h-5 text-muted-foreground" />
+            </button>
+        );
+    }
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

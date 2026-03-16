@@ -2,43 +2,82 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export async function getDashboardMetrics(restaurantId: string) {
+export async function getDashboardMetrics(restaurantId: string, startDate?: string, endDate?: string) {
     const supabase = await createClient();
 
-    // 1. Total Orders & Revenue (All Time - for simple start, can be filtered by date later)
-    const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select("total, status, created_at")
-        .eq("restaurant_id", restaurantId)
-        .neq("status", "cancelled")
-        .neq("status", "rejected");
+    // PERFORMANCE OPTIMIZATION (Level 2): Use server-side RPC for aggregation
+    try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc("get_dashboard_analytics", {
+            p_restaurant_id: restaurantId,
+            p_start_date: startDate || null,
+            p_end_date: endDate || null
+        });
 
-    if (ordersError) {
-        console.error("Error fetching orders for analytics", ordersError);
-        throw new Error("Failed to load analytics data");
+        if (!rpcError && rpcData) {
+            return {
+                totalOrders: Number(rpcData.totalOrders),
+                totalRevenue: Number(rpcData.totalRevenue),
+                topProducts: rpcData.topProducts || [],
+                dailyData: rpcData.dailyData || [],
+                conversionRates: rpcData.conversionRates || []
+            };
+        }
+        
+        if (rpcError) {
+            console.warn("Analytics RPC failed, falling back to JS aggregation:", rpcError.message);
+        }
+    } catch (e) {
+        console.error("Critical RPC error, using fallback:", e);
     }
 
+    // FALLBACK: Optimized parallel JS aggregation
+    const effectiveStart = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const effectiveEnd = endDate || new Date().toISOString();
+    
+    const [ordersResult, orderItemsResult, productsResult] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("total, status, created_at")
+            .eq("restaurant_id", restaurantId)
+            .neq("status", "cancelled")
+            .neq("status", "rejected")
+            .gte("created_at", effectiveStart)
+            .lte("created_at", effectiveEnd),
+        
+        supabase
+            .from("order_items")
+            .select(`
+                quantity,
+                product_id,
+                item_name,
+                orders!inner(restaurant_id, status, created_at)
+            `)
+            .eq("orders.restaurant_id", restaurantId)
+            .neq("orders.status", "cancelled")
+            .neq("orders.status", "rejected")
+            .gte("orders.created_at", effectiveStart)
+            .lte("orders.created_at", effectiveEnd),
+        
+        // 3. Fetch Products for Intent Analytics
+        supabase
+            .from("products")
+            .select("id, name, view_count")
+            .eq("restaurant_id", restaurantId)
+            .is("deleted_at", null)
+    ]);
+
+    if (ordersResult.error) throw new Error("Failed to load analytics data");
+    
+    const orders = ordersResult.data;
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
 
-    // 2. Fetch Order Items for Top Products
-    // We need to join order_items with orders to ensure we only count items from valid (non-cancelled) orders
-    const { data: orderItemsData, error: itemsError } = await supabase
-        .from("order_items")
-        .select(`
-            quantity,
-            product_id,
-            item_name,
-            orders!inner(restaurant_id, status)
-        `)
-        .eq("orders.restaurant_id", restaurantId)
-        .neq("orders.status", "cancelled")
-        .neq("orders.status", "rejected");
+    // if (orderItemsResult.error) { // This check is removed as per the new code
+    //     console.error("Error fetching order items for analytics", orderItemsResult.error);
+    //     throw new Error("Failed to load top products");
+    // }
 
-    if (itemsError) {
-        console.error("Error fetching order items for analytics", itemsError);
-        throw new Error("Failed to load top products");
-    }
+    const orderItemsData = orderItemsResult.data || [];
 
     // Aggregate quantities by product name
     const productSales: { [key: string]: number } = {};
@@ -47,69 +86,55 @@ export async function getDashboardMetrics(restaurantId: string) {
         productSales[name] = (productSales[name] || 0) + item.quantity;
     });
 
-    // Convert to sorted array for charts
+    // Sort and slice top products
     const topProducts = Object.entries(productSales)
         .map(([name, sales]) => ({ name, sales }))
         .sort((a, b) => b.sales - a.sales)
-        .slice(0, 5); // Get top 5
+        .slice(0, 5);
 
-    // 3. Simple Revenue Over Time (Last 7 Days)
-    const last7Days = [...Array(7)].map((_, i) => {
-        const d = new Date();
+    // Dynamic Daily Data (Revenue & Orders)
+    const startDateObj = new Date(effectiveStart);
+    const endDateObj = new Date(effectiveEnd);
+    const dayDiff = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) || 7;
+    const chartPeriods = dayDiff > 31 ? 31 : dayDiff; // Cap fallback chart at 31 days
+
+    const dailyMap: { [key: string]: { revenue: number, orders: number } } = {};
+    for (let i = 0; i < chartPeriods; i++) {
+        const d = new Date(endDateObj);
         d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
-    }).reverse();
-
-    const revenueByDay: { [key: string]: number } = {};
-    last7Days.forEach(day => revenueByDay[day] = 0);
+        const dayKey = d.toISOString().split('T')[0];
+        dailyMap[dayKey] = { revenue: 0, orders: 0 };
+    }
 
     orders.forEach(order => {
         const dateStr = order.created_at.split('T')[0];
-        if (revenueByDay[dateStr] !== undefined) {
-            revenueByDay[dateStr] += Number(order.total);
+        if (dailyMap[dateStr]) {
+            dailyMap[dateStr].revenue += Number(order.total);
+            dailyMap[dateStr].orders += 1;
         }
     });
 
-    const revenueData = last7Days.map(date => ({
-        date: date.substring(5), // MM-DD for cleaner chart labels
-        revenue: revenueByDay[date]
-    }));
+    const dailyData = Object.entries(dailyMap)
+        .map(([date, vals]) => ({
+            date: date.substring(5), 
+            revenue: vals.revenue,
+            orders: vals.orders
+        }))
+        .reverse();
 
-    // 4. Intent Analytics (Conversion Rates)
-    const { data: productsData, error: productsError } = await supabase
-        .from("products")
-        .select("id, name, view_count")
-        .eq("restaurant_id", restaurantId)
-        .is("deleted_at", null);
+    // 5. Intent Analytics (Conversion Rates)
+    let conversionRates: any[] = [];
 
-    let conversionRates: { name: string; views: number; sales: number; rate: number }[] = [];
-
-    if (!productsError && productsData) {
-        conversionRates = productsData.map(p => {
+    if (!productsResult.error && productsResult.data) {
+        conversionRates = productsResult.data.map(p => {
             const views = p.view_count || 0;
             const sales = productSales[p.name] || 0;
-            let rate = 0;
-            if (views > 0) {
-                rate = (sales / views) * 100;
-                // Cap at 100% just in case of historical anomalies
-                if (rate > 100) rate = 100;
-            }
-            return {
-                name: p.name,
-                views: views,
-                sales: sales,
-                rate: Number(rate.toFixed(1))
-            };
+            const rate = views > 0 ? Math.min((sales / views) * 100, 100) : 0;
+            return { name: p.name, views, sales, rate: Number(rate.toFixed(1)) };
         })
-            .filter(p => p.views > 0) // Only show items that have been viewed
-            .sort((a, b) => b.views - a.views); // Sort by most viewed first
+            .filter(p => p.views > 0)
+            .sort((a, b) => b.views - a.views);
     }
 
-    return {
-        totalOrders,
-        totalRevenue,
-        topProducts,
-        revenueData,
-        conversionRates
-    };
+    return { totalOrders, totalRevenue, topProducts, dailyData, conversionRates };
 }

@@ -39,7 +39,8 @@
         "wed": "Wednesday",
         "thu": "Thursday",
         "fri": "Friday",
-        "sat": "Saturday"
+        "sat": "Saturday",
+        "category": "Category"
     },
     "sidebar": {
         "dashboard": "Dashboard",
@@ -52,7 +53,9 @@
         "delivery": "Delivery",
         "discounts": "Discounts",
         "billing": "Billing",
+        "support": "Support",
         "settings": "Settings",
+        "locations": "City Locations",
         "logout": "Logout"
     },
     "dashboard": {
@@ -96,7 +99,20 @@
         "ofTotal": "of total",
         "visitsLast7": "Visits (Last 7 Days)",
         "qrCode": "QR Code",
-        "directLink": "Direct Link"
+        "directLink": "Direct Link",
+        "last7Days": "Last 7 Days",
+        "last30Days": "Last 30 Days",
+        "customRange": "Custom Range",
+        "filterRange": "Filter Range",
+        "selectRange": "Select Range",
+        "from": "From Date",
+        "to": "To Date",
+        "today": "Today",
+        "visitsTrend": "Visits Trend",
+        "revenueTrend": "Revenue Trend",
+        "ordersTrend": "Orders Trend",
+        "revenue": "Revenue",
+        "orders": "Orders"
     },
     "notifications": {
         "title": "Notifications",
@@ -138,7 +154,7 @@
         "productName": "Product Name",
         "noCategories": "No categories",
         "noProducts": "No products",
-        "available": "Available",
+        "available": "Available for Order",
         "unavailable": "Unavailable",
         "hidden": "Hidden",
         "allItems": "All Items",
@@ -175,7 +191,14 @@
         "hiddenItems": "Hidden Items",
         "discountedItems": "Discounted Items",
         "menuEmpty": "Menu is Empty",
-        "createCategoryToStart": "Create your first category to start adding products."
+        "createCategoryToStart": "Create your first category to start adding products.",
+        "showTranslations": "Add Other Languages (English / Kurdish)",
+        "translations": "Languages & Translations",
+        "mustSelectOne": "Must select one (Required)",
+        "optionalAddons": "Optional Add-ons",
+        "prepTime": "Prep Time (min)",
+        "advancedSettings": "Advanced Settings",
+        "advancedSettingsDesc": "Control product availability, stock, and additional details."
     },
     "orders": {
         "activeOrders": "Active Orders",
@@ -261,6 +284,8 @@
         "subscriptionExpired": "We're sorry, the menu is currently unavailable due to an expired subscription.",
         "viewCart": "View Cart",
         "currency": "IQD",
+        "startsFrom": "Starts from",
+        "selectOptionMessage": "Please select an option to continue",
         "checkout": {
             "orderPlaced": "Order Placed!",
             "orderReceived": "Your order has been received. We'll start preparing it shortly.",
@@ -307,6 +332,7 @@
                 "placeholder": "Enter coupon code",
                 "apply": "Apply",
                 "success": "Coupon applied! You saved {{discount}}",
+                "freeDeliveryApplied": "Free delivery coupon applied!",
                 "invalid": "Invalid coupon"
             },
             "summary": {

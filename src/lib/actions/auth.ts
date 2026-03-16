@@ -2,6 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { signUpSchema } from "@/lib/validations/schemas";
+import { z } from "zod";
+import { PLAN_LIMITS } from "@/lib/actions/subscription";
 
 export async function signUp(formData: FormData) {
     const supabase = await createClient();
@@ -11,6 +14,16 @@ export async function signUp(formData: FormData) {
     const fullName = formData.get("fullName") as string;
     const restaurantName = formData.get("restaurantName") as string;
     const plan = (formData.get("plan") as string) || "free";
+
+    // Validate password strength and email format
+    try {
+        signUpSchema.parse({ email, password, name: fullName });
+    } catch (e) {
+        if (e instanceof z.ZodError) {
+            return { error: e.issues[0].message };
+        }
+        return { error: "بيانات غير صالحة" };
+    }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -49,11 +62,7 @@ export async function signUp(formData: FormData) {
         }
 
         // Plan-based limits
-        const planConfig = {
-            free: { max_products: 15, max_orders_per_month: 50 },
-            pro: { max_products: 100, max_orders_per_month: 500 },
-            business: { max_products: 999999, max_orders_per_month: 999999 },
-        }[plan] || { max_products: 15, max_orders_per_month: 50 };
+        const planConfig = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
 
         const { data: restaurant, error: restaurantError } = await supabase
             .from("restaurants")

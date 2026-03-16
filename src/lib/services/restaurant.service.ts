@@ -120,6 +120,8 @@ export class RestaurantService {
                 subscription_status: "active",
                 max_products: limits.max_products,
                 max_orders_per_month: limits.max_orders_per_month,
+                governorate: input.governorate,
+                city: input.city,
             })
             .select()
             .single();
@@ -145,6 +147,55 @@ export class RestaurantService {
             throw new Error(`فشل ربط الحساب بالمطعم: ${profileError.message}`);
         }
 
+        // 8. Auto-populate delivery zones if city is provided
+        if (input.city) {
+            try {
+                await this.populateDeliveryZones(restaurant.id, input.city, dbClient);
+            } catch (e) {
+                console.error("Failed to populate delivery zones:", e);
+                // We don't fail the whole creation for this, but log it.
+            }
+        }
+
         return restaurant;
+    }
+
+    static async populateDeliveryZones(restaurantId: string, city: string, dbClient: any) {
+        // 1. Fetch areas for this city from master_locations
+        const { data: areas, error: fetchError } = await dbClient
+            .from("master_locations")
+            .select("name_ar")
+            .eq("city_name_ar", city);
+
+        if (fetchError || !areas || areas.length === 0) {
+            console.log(`No areas found for city: ${city}`);
+            return;
+        }
+
+        // 2. Create a default Delivery Zone for this city
+        const { data: zone, error: zoneError } = await dbClient
+            .from("delivery_zones")
+            .insert({
+                restaurant_id: restaurantId,
+                zone_name: city,
+                flat_rate: 0,
+                is_active: true
+            })
+            .select()
+            .single();
+
+        if (zoneError) throw zoneError;
+
+        // 3. Insert specific areas into delivery_areas
+        const deliveryAreas = areas.map((a: any) => ({
+            zone_id: zone.id,
+            area_name: a.name_ar
+        }));
+
+        const { error: areaError } = await dbClient
+            .from("delivery_areas")
+            .insert(deliveryAreas);
+
+        if (areaError) throw areaError;
     }
 }

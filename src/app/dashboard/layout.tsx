@@ -12,6 +12,7 @@ import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { BottomTabBar } from "@/components/dashboard/BottomTabBar";
 import { MobileHeader } from "@/components/dashboard/MobileHeader";
 import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
+import { GlobalAnnouncement } from "@/components/dashboard/GlobalAnnouncement";
 import { useTranslation } from "@/lib/i18n/context";
 import {
     LayoutDashboard,
@@ -31,6 +32,7 @@ import {
     CreditCard,
     Globe,
     Settings,
+    HeadphonesIcon,
 } from "lucide-react";
 
 type Role = "owner" | "manager" | "cashier" | "kitchen";
@@ -57,6 +59,7 @@ const navItems: NavItem[] = [
         labelKey: "deliverySettings.title", icon: Truck, allowedRoles: ["owner", "manager"],
         children: [
             { href: "/dashboard/delivery/zones", labelKey: "deliverySettings.zones", icon: MapPin, allowedRoles: ["owner", "manager"] },
+            { href: "/dashboard/delivery/locations", labelKey: "sidebar.locations", icon: Globe, allowedRoles: ["owner", "manager"] },
             { href: "/dashboard/delivery/hours", labelKey: "settings.workingHours", icon: Clock, allowedRoles: ["owner", "manager"] },
         ],
     },
@@ -64,6 +67,7 @@ const navItems: NavItem[] = [
     { href: "/dashboard/analytics", labelKey: "sidebar.analytics", icon: BarChart3, allowedRoles: ["owner", "manager"] },
     { href: "/dashboard/appearance", labelKey: "sidebar.appearance", icon: Palette, allowedRoles: ["owner"] },
     { href: "/dashboard/billing", labelKey: "sidebar.billing", icon: CreditCard, allowedRoles: ["owner"] },
+    { href: "/dashboard/support", labelKey: "sidebar.support", icon: HeadphonesIcon, allowedRoles: ["owner", "manager"] },
     {
         labelKey: "sidebar.settings", icon: Settings, allowedRoles: ["owner"],
         children: [
@@ -231,6 +235,7 @@ export default function DashboardLayout({
 
                 {/* pt-16 on mobile for header, pb-20 for bottom bar */}
                 <div className="p-4 pt-[68px] pb-24 lg:p-8 lg:pt-8 lg:pb-8">
+                    <GlobalAnnouncement />
                     {children}
                 </div>
             </main>

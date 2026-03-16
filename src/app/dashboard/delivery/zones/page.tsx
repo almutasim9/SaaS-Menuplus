@@ -11,27 +11,36 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Truck, MapPin, ChevronDown, ChevronRight, Gift } from "lucide-react";
+import { Plus, Pencil, Trash2, Truck, MapPin, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { 
     useRestaurantId, 
     useFreeDeliveryStatus, 
     useDeliveryZones, 
-    useToggleFreeDeliveryMutation, 
     useDeleteDeliveryZoneMutation, 
     useUpdateDeliveryZoneMutation,
     useDeleteDeliveryAreaMutation,
+    useOutOfZoneStatus,
     type ZoneWithAreas 
 } from "@/lib/hooks/useDeliveryZones";
 import { ZoneFormModal } from "@/components/dashboard/delivery/ZoneFormModal";
 import { AreaFormModal } from "@/components/dashboard/delivery/AreaFormModal";
+import { GlobalDeliverySettings } from "@/components/dashboard/delivery/GlobalDeliverySettings";
+import { syncRestaurantAreas } from "@/lib/actions/delivery";
 
 export default function DeliveryZonesPage() {
     const { data: restaurantId, isLoading: idLoading } = useRestaurantId();
-    const { data: isFreeDelivery = false, isLoading: freeLoading } = useFreeDeliveryStatus(restaurantId ?? null);
-    const { data: zones = [], isLoading: zonesLoading } = useDeliveryZones(restaurantId ?? null);
+    const { data: isFreeDelivery = false } = useFreeDeliveryStatus(restaurantId ?? null);
+    const { data: outOfZoneData = { accept: false, minOrder: 0 } } = useOutOfZoneStatus(restaurantId ?? null);
+    const acceptOutOfZone = outOfZoneData.accept;
+    const outOfZoneMinOrderInitial = outOfZoneData.minOrder;
+    const { data: zones = [], isLoading: zonesLoading, refetch } = useDeliveryZones(restaurantId ?? null);
+    
+    
+    // We could fetch the restaurant city here or pass it if available
+    // For now I'll just rely on the syncRestaurantAreas action finding it
 
-    const toggleFreeMutation = useToggleFreeDeliveryMutation();
+
     const deleteZoneMutation = useDeleteDeliveryZoneMutation();
     const updateZoneMutation = useUpdateDeliveryZoneMutation();
     const deleteAreaMutation = useDeleteDeliveryAreaMutation();
@@ -41,8 +50,7 @@ export default function DeliveryZonesPage() {
     const [areaModalOpen, setAreaModalOpen] = useState(false);
     const [selectedZone, setSelectedZone] = useState<ZoneWithAreas | null>(null);
     const [expandedZones, setExpandedZones] = useState<Record<string, boolean>>({});
-
-    const loading = idLoading || freeLoading || zonesLoading;
+    const loading = idLoading || zonesLoading;
 
     const handleDeleteZone = async (id: string) => {
         try {
@@ -76,17 +84,6 @@ export default function DeliveryZonesPage() {
         }
     };
 
-    const handleToggleFreeDelivery = async () => {
-        if (!restaurantId) return;
-        const newValue = !isFreeDelivery;
-        try {
-            await toggleFreeMutation.mutateAsync({ restaurantId, isFree: newValue });
-            toast.success(newValue ? 'تم تفعيل التوصيل المجاني لجميع الطلبات' : 'تم إلغاء التوصيل المجاني');
-        } catch {
-            toast.error('فشل في تحديث إعداد التوصيل');
-        }
-    };
-
     const openEditZone = (zone: ZoneWithAreas) => {
         setEditingZone(zone);
         setZoneModalOpen(true);
@@ -116,30 +113,13 @@ export default function DeliveryZonesPage() {
 
     return (
         <div className="space-y-6">
-            {/* FREE DELIVERY BANNER */}
-            <div className={`glass-card rounded-2xl p-5 border-2 transition-colors ${isFreeDelivery ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-border/50'}`}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isFreeDelivery ? 'bg-emerald-500/20 text-emerald-500' : 'bg-secondary/50 text-muted-foreground'}`}>
-                            <Gift className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold">توصيل مجاني لجميع الطلبات</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {isFreeDelivery
-                                    ? 'مفعّل — سيتم تجاهل أسعار التوصيل لجميع المناطق'
-                                    : 'عند التفعيل سيتم التوصيل مجاناً بغض النظر عن المنطقة'}
-                            </p>
-                        </div>
-                    </div>
-                    <Switch checked={isFreeDelivery} onCheckedChange={handleToggleFreeDelivery} />
-                </div>
-                {isFreeDelivery && (
-                    <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-xs text-emerald-600 font-medium">
-                        🚚 التوصيل المجاني مفعّل حالياً — يظهر للزبائن في الواجهة
-                    </div>
-                )}
-            </div>
+            {/* DELIVERY SETTINGS */}
+            <GlobalDeliverySettings 
+                restaurantId={restaurantId ?? null}
+                isFreeDelivery={isFreeDelivery}
+                acceptOutOfZone={acceptOutOfZone}
+                outOfZoneMinOrderInitial={outOfZoneMinOrderInitial}
+            />
 
             <div className="flex items-center justify-between">
                 <div>
@@ -148,10 +128,12 @@ export default function DeliveryZonesPage() {
                         إعداد مناطق التوصيل والأسعار
                     </p>
                 </div>
-                <Button onClick={openCreateZone} className="gradient-emerald text-white rounded-xl gap-2 hover:opacity-90">
-                    <Plus className="w-4 h-4" />
-                    إضافة منطقة (Add Zone)
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={openCreateZone} className="gradient-emerald text-white rounded-xl gap-2 hover:opacity-90">
+                        <Plus className="w-4 h-4" />
+                        إضافة منطقة (Add Zone)
+                    </Button>
+                </div>
             </div>
 
             <ZoneFormModal 
@@ -183,6 +165,8 @@ export default function DeliveryZonesPage() {
                                 <TableHead className="text-right">المنطقة (Zone)</TableHead>
                                 <TableHead className="text-right">السعر (Rate)</TableHead>
                                 <TableHead className="text-right">التوصيل المجاني</TableHead>
+                                <TableHead className="text-right">الحد الأدنى للطلب</TableHead>
+                                <TableHead className="text-right">وقت التوصيل</TableHead>
                                 <TableHead className="text-right">الحالة (Status)</TableHead>
                                 <TableHead className="text-left">الإجراءات</TableHead>
                             </TableRow>
@@ -206,6 +190,14 @@ export default function DeliveryZonesPage() {
                                             {zone.free_delivery_threshold
                                                 ? `${Number(zone.free_delivery_threshold).toFixed(0)} د.ع`
                                                 : <span className="text-muted-foreground">—</span>}
+                                        </TableCell>
+                                        <TableCell>
+                                            {zone.min_order_amount && zone.min_order_amount > 0 
+                                                ? `${Number(zone.min_order_amount).toFixed(0)} د.ع` 
+                                                : <span className="text-muted-foreground">—</span>}
+                                        </TableCell>
+                                        <TableCell>
+                                            {zone.estimated_delivery_time || <span className="text-muted-foreground">—</span>}
                                         </TableCell>
                                         <TableCell>
                                             <Switch checked={zone.is_active} onCheckedChange={() => handleToggleActive(zone)} />

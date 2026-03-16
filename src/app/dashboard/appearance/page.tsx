@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase/client";
 import { getRestaurantAppearance, updateAppearance } from "@/lib/actions/appearance";
 import { Palette, Upload, Check, UtensilsCrossed, ImageIcon, Facebook, Instagram, Twitter, Music2, Type, LayoutTemplate, Plus } from "lucide-react";
+import NextImage from "next/image";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Json } from "@/lib/types/database.types";
+import { arabicToEnglishNumbers } from "@/lib/utils";
 
 const presetColors = [
     "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#f59e0b",
@@ -259,7 +261,7 @@ export default function AppearancePage() {
                                         <div className="flex items-center gap-4">
                                             <div className="w-16 h-16 rounded-xl bg-secondary/50 flex items-center justify-center overflow-hidden border">
                                                 {logoPreview || logoUrl ? (
-                                                    <img src={logoPreview || logoUrl!} alt="Logo" className="w-full h-full object-cover" />
+                                                    <NextImage src={logoPreview || logoUrl!} alt="Logo" className="w-full h-full object-cover" width={64} height={64} unoptimized />
                                                 ) : <ImageIcon className="w-6 h-6 text-muted-foreground/30" />}
                                             </div>
                                             <Input name="logo" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleFilePreview(e.target.files[0], setLogoPreview)} className="flex-1 rounded-xl bg-secondary/50 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
@@ -271,7 +273,7 @@ export default function AppearancePage() {
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-lg bg-secondary/50 flex items-center justify-center overflow-hidden border">
                                                 {faviconPreview || faviconUrl ? (
-                                                    <img src={faviconPreview || faviconUrl!} alt="Favicon" className="w-full h-full object-cover" />
+                                                    <NextImage src={faviconPreview || faviconUrl!} alt="Favicon" className="w-full h-full object-cover" width={48} height={48} unoptimized />
                                                 ) : <ImageIcon className="w-5 h-5 text-muted-foreground/30" />}
                                             </div>
                                             <Input name="favicon" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleFilePreview(e.target.files[0], setFaviconPreview)} className="flex-1 rounded-xl bg-secondary/50 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
@@ -282,7 +284,7 @@ export default function AppearancePage() {
                                         <Label>{t("appearance.banner") || "Cover Banner Image"}</Label>
                                         <div className="aspect-[3/1] rounded-xl bg-secondary/50 border-2 border-dashed border-border/50 flex items-center justify-center overflow-hidden">
                                             {bannerPreview || bannerUrl ? (
-                                                <img src={bannerPreview || bannerUrl!} alt="Banner" className="w-full h-full object-cover" />
+                                                <NextImage src={bannerPreview || bannerUrl!} alt="Banner" className="w-full h-full object-cover" fill unoptimized />
                                             ) : (
                                                 <div className="text-center text-muted-foreground/50">
                                                     <ImageIcon className="w-8 h-8 mx-auto mb-1" />
@@ -298,7 +300,7 @@ export default function AppearancePage() {
                                         <div className="flex items-center gap-4">
                                             <div className="w-16 h-16 rounded-xl bg-secondary/50 flex items-center justify-center overflow-hidden border">
                                                 {defaultProductImagePreview || defaultProductImageUrl ? (
-                                                    <img src={defaultProductImagePreview || defaultProductImageUrl!} alt="Default Product" className="w-full h-full object-cover" />
+                                                    <NextImage src={defaultProductImagePreview || defaultProductImageUrl!} alt="Default Product" className="w-full h-full object-cover" width={64} height={64} unoptimized />
                                                 ) : <ImageIcon className="w-6 h-6 text-muted-foreground/30" />}
                                             </div>
                                             <Input name="default_product_image_file" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleFilePreview(e.target.files[0], setDefaultProductImagePreview)} className="flex-1 rounded-xl bg-secondary/50 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
@@ -420,7 +422,7 @@ export default function AppearancePage() {
                                             <Label>WhatsApp Business Number</Label>
                                             <Input
                                                 value={whatsappNumber}
-                                                onChange={(e) => setWhatsappNumber(e.target.value)}
+                                                onChange={(e) => setWhatsappNumber(arabicToEnglishNumbers(e.target.value))}
                                                 placeholder="With country code (e.g., +964...)"
                                                 className="bg-secondary/50 rounded-xl border-border/50"
                                             />
@@ -498,7 +500,7 @@ export default function AppearancePage() {
                             <div className="px-4 mt-2">
                                 <div className="w-full rounded-2xl relative overflow-hidden shadow-sm aspect-[2.5/1] flex flex-col items-center justify-center p-4 text-center" style={{ backgroundColor: primaryColor }}>
                                     {bannerPreview || bannerUrl ? (
-                                        <img src={bannerPreview || bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+                                        <NextImage src={bannerPreview || bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" fill unoptimized />
                                     ) : null}
                                     <div className="relative z-10 w-full">
                                         <h2 className="text-white text-sm font-bold drop-shadow-sm">
@@ -535,7 +537,7 @@ export default function AppearancePage() {
                                             <div key={i} className={`flex ${layoutProducts === "grid" ? "flex-col p-2 h-auto" : "items-center p-2 gap-2 h-20"} rounded-2xl border shadow-sm ${themeMode === 'dark' ? 'bg-[#141414] border-gray-800' : 'bg-white border-gray-100'}`}>
                                                 <div className={`${layoutProducts === "grid" ? "w-full aspect-square mb-2" : "w-14 h-14"} rounded-xl ${themeMode === 'dark' ? 'bg-[#2a2a2a]' : 'bg-gray-100/70'} flex items-center justify-center shrink-0 overflow-hidden`}>
                                                     {defaultProductImagePreview || defaultProductImageUrl ? (
-                                                        <img src={defaultProductImagePreview || defaultProductImageUrl!} className="w-[85%] h-[85%] object-cover scale-95" alt="" />
+                                                        <NextImage src={defaultProductImagePreview || defaultProductImageUrl!} className="w-[85%] h-[85%] object-cover scale-95" alt="" width={56} height={56} unoptimized />
                                                     ) : <ImageIcon className="w-5 h-5 opacity-20" />}
                                                 </div>
                                                 <div className={`flex flex-col justify-between flex-1 w-full relative ${layoutProducts === "grid" ? "pt-2 px-1 pb-1" : ""}`}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import NextImage from "next/image";
 import { motion } from "framer-motion";
 import { UtensilsCrossed, Bell, User as UserIcon, Truck } from "lucide-react";
 import { CategoryFilter } from "@/components/menu/CategoryFilter";
@@ -137,7 +138,7 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                 <div className="px-5 mt-2">
                     <div className="w-full rounded-2xl md:rounded-3xl relative overflow-hidden shadow-sm aspect-[4/1] md:aspect-[6/1] flex flex-col items-center justify-center p-4 md:p-6 text-center" style={{ backgroundColor: primaryColor }}>
                         {restaurant.banner_url ? (
-                            <img src={restaurant.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+                            <NextImage src={restaurant.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover opacity-90" fill unoptimized />
                         ) : null}
 
                         <div className="relative z-10 w-full">

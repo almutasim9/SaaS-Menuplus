@@ -7,26 +7,30 @@ import { z } from "zod";
 import { checkLimitAccess } from "@/lib/actions/subscription";
 import { headers } from "next/headers";
 import { sendPushNotification } from "@/lib/supabase/firebase-admin";
+import { requireRestaurantOwnership } from "@/lib/actions/_auth-guard";
+import { RATE_LIMITS } from "@/lib/constants";
 
 export async function getOrders(restaurantId: string) {
+    // Ensure the caller owns this restaurant
+    await requireRestaurantOwnership(restaurantId);
+
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select("id, restaurant_id, order_type, status, subtotal, discount_amount, delivery_fee, total, table_number, customer_name, customer_phone, customer_address, notes, coupon_code, created_at, number_of_people, area_name, nearest_landmark, car_details, order_items(id, product_id, quantity, unit_price, item_name, variant_details, addons_details)")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    // Map order_items to items field for compatibility with existing components
     return data.map(order => ({
         ...order,
-        items: (order.order_items as any[] || []).map(item => ({
+        items: ((order.order_items as unknown as Array<{ product_id: string; item_name: string; unit_price: number; quantity: number; variant_details?: Record<string, unknown> }>) || []).map(item => ({
             id: item.product_id,
             name: item.item_name,
             price: item.unit_price,
             quantity: item.quantity,
-            ...(item.variant_details || {}) // Spread variant/addons if they exist
+            ...(item.variant_details || {})
         }))
     }));
 }
@@ -38,26 +42,15 @@ export async function createOrder(orderData: any) {
         const headersList = await headers();
         const clientIp = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
 
-        // Add client_ip to payload
-        const payloadToInsert = {
-            ...validatedData,
-            client_ip: clientIp !== 'unknown' ? clientIp : null
-        };
-
         // --- Feature Gating: Check order limit ---
         const limit = await checkLimitAccess(validatedData.restaurant_id, "orders");
         if (!limit.allowed) {
             throw new Error(`هذا المطعم وصل للحد الأقصى من الطلبات الشهرية (${limit.max}). يرجى التواصل مع صاحب المطعم.`);
         }
-        // --- End Feature Gating ---
 
         const adminClient = createAdminClient();
 
-        // ----------------------------------------------------
-        // Rate Limiting (Spam Prevention) Disable for testing:
-        // ----------------------------------------------------
-        /* 
-        // 1. IP Based (Max 5 orders per 15 mins)
+        // --- Rate Limiting (Spam Prevention) ---
         if (clientIp !== 'unknown') {
             const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
             const { count, error: ipCountError } = await adminClient
@@ -67,15 +60,13 @@ export async function createOrder(orderData: any) {
                 .eq("client_ip", clientIp)
                 .gte("created_at", fifteenMinsAgo);
 
-            if (!ipCountError && count && count >= 5) {
+            if (!ipCountError && count && count >= RATE_LIMITS.IP_ORDERS_PER_15_MIN) {
                 throw new Error("لقد تجاوزت الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.");
             }
         }
 
-        // 2. Phone Based (Max 2 orders per 2 minutes)
         if (validatedData.customer_phone && validatedData.customer_phone !== "N/A" && validatedData.customer_phone.trim() !== "") {
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-
             const { count, error: countError } = await adminClient
                 .from("orders")
                 .select("*", { count: 'exact', head: true })
@@ -83,12 +74,196 @@ export async function createOrder(orderData: any) {
                 .eq("customer_phone", validatedData.customer_phone)
                 .gte("created_at", twoMinutesAgo);
 
-            if (!countError && count && count >= 2) { // Max 2 orders per 2 minutes
+            if (!countError && count && count >= RATE_LIMITS.PHONE_ORDERS_PER_2_MIN) {
                 throw new Error("عذراً، لقد قمت بإرسال طلبات كثيرة. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى.");
             }
         }
-        */
-        // ----------------------------------------------------
+        // --- End Rate Limiting ---
+
+        // -------------------------------------------------------
+        // SERVER-SIDE PRICE VERIFICATION
+        // Never trust prices sent from the client — always recalculate from DB.
+        // -------------------------------------------------------
+        const productIds = validatedData.items
+            .map((item: any) => item.id)
+            .filter(Boolean);
+
+        // Fetch all products for this restaurant in one query
+        const { data: dbProducts, error: productsError } = await adminClient
+            .from("products")
+            .select("id, price, name, is_available")
+            .in("id", productIds)
+            .eq("restaurant_id", validatedData.restaurant_id)
+            .is("deleted_at", null);
+
+        if (productsError) throw new Error("فشل في التحقق من المنتجات");
+        if (!dbProducts || dbProducts.length === 0) {
+            throw new Error("المنتجات المطلوبة غير موجودة");
+        }
+
+        // Fetch all variants and addons for the requested products
+        const variantIds = validatedData.items
+            .map((item: any) => item.variant?.id)
+            .filter(Boolean);
+
+        const addonIds = validatedData.items
+            .flatMap((item: any) => (item.addons || []).map((a: any) => a.id))
+            .filter(Boolean);
+
+        const [variantsResult, addonsResult] = await Promise.all([
+            variantIds.length > 0
+                ? adminClient.from("product_variants").select("id, price").in("id", variantIds)
+                : Promise.resolve({ data: [], error: null }),
+            addonIds.length > 0
+                ? adminClient.from("product_addons").select("id, price").in("id", addonIds)
+                : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        const dbVariantsMap = new Map((variantsResult.data || []).map((v: any) => [v.id, v.price]));
+        const dbAddonsMap = new Map((addonsResult.data || []).map((a: any) => [a.id, a.price]));
+        const dbProductsMap = new Map(dbProducts.map((p: any) => [p.id, p]));
+
+        // Calculate server-side subtotal
+        let calculatedSubtotal = 0;
+        const verifiedItems: any[] = [];
+
+        for (const item of validatedData.items) {
+            const dbProduct = dbProductsMap.get(item.id);
+            if (!dbProduct) {
+                throw new Error(`المنتج غير موجود أو لا ينتمي لهذا المطعم`);
+            }
+
+            let itemPrice = dbProduct.price;
+
+            // Add variant price from DB (not from client)
+            if (item.variant?.id) {
+                const variantPrice = dbVariantsMap.get(item.variant.id);
+                if (variantPrice !== undefined) {
+                    itemPrice += variantPrice;
+                }
+            }
+
+            // Add addons price from DB (not from client)
+            if (item.addons && item.addons.length > 0) {
+                for (const addon of item.addons) {
+                    if (addon.id) {
+                        const addonPrice = dbAddonsMap.get(addon.id);
+                        if (addonPrice !== undefined) {
+                            itemPrice += addonPrice;
+                        }
+                    }
+                }
+            }
+
+            calculatedSubtotal += itemPrice * item.quantity;
+            verifiedItems.push({ ...item, price: itemPrice });
+        }
+
+        // Calculate delivery fee from DB (not from client)
+        let calculatedDeliveryFee = 0;
+        if (validatedData.order_type === 'delivery' && validatedData.area_name) {
+            const { data: deliveryArea } = await adminClient
+                .from("delivery_areas")
+                .select("zone_id, delivery_zones!inner(flat_rate, free_delivery_threshold, min_order_amount, is_active, restaurant_id)")
+                .eq("area_name", validatedData.area_name)
+                .eq("delivery_zones.restaurant_id", validatedData.restaurant_id)
+                .maybeSingle();
+
+            if (deliveryArea) {
+                const zone = (deliveryArea as any).delivery_zones;
+                if (zone?.is_active) {
+                    const threshold = zone.free_delivery_threshold;
+                    if (!threshold || calculatedSubtotal < threshold) {
+                        calculatedDeliveryFee = zone.flat_rate || 0;
+                    }
+                    // Min order check
+                    const minOrder = zone.min_order_amount || 0;
+                    if (minOrder > 0 && calculatedSubtotal < minOrder) {
+                        throw new Error(`الحد الأدنى للطلب في هذه المنطقة هو ${minOrder} د.ع`);
+                    }
+                }
+            } else {
+                // Area not in any zone — check out_of_zone settings
+                const { data: restaurant } = await adminClient
+                    .from("restaurants")
+                    .select("accept_out_of_zone_orders, out_of_zone_min_order, is_free_delivery")
+                    .eq("id", validatedData.restaurant_id)
+                    .single();
+
+                if (!restaurant?.accept_out_of_zone_orders) {
+                    throw new Error("عذراً، منطقتك خارج نطاق التوصيل");
+                }
+                const outOfZoneMin = restaurant.out_of_zone_min_order || 0;
+                if (outOfZoneMin > 0 && calculatedSubtotal < outOfZoneMin) {
+                    throw new Error(`الحد الأدنى للطلب خارج النطاق هو ${outOfZoneMin} د.ع`);
+                }
+                // Out-of-zone delivery fee stays 0 (or could be configurable)
+            }
+
+            // Check global free delivery toggle
+            const { data: restFreeDelivery } = await adminClient
+                .from("restaurants")
+                .select("is_free_delivery")
+                .eq("id", validatedData.restaurant_id)
+                .single();
+
+            if (restFreeDelivery?.is_free_delivery) {
+                calculatedDeliveryFee = 0;
+            }
+        }
+
+        // Calculate discount from DB via validateCoupon server logic (not from client)
+        let calculatedDiscount = 0;
+        if (validatedData.coupon_code) {
+            const { data: coupon } = await adminClient
+                .from("coupons")
+                .select("*")
+                .eq("restaurant_id", validatedData.restaurant_id)
+                .eq("code", validatedData.coupon_code.toUpperCase())
+                .eq("is_active", true)
+                .is("deleted_at", null)
+                .single();
+
+            if (coupon) {
+                const now = new Date();
+                const notExpired = !coupon.expires_at || new Date(coupon.expires_at) >= now;
+                const underLimit = !coupon.max_uses || coupon.used_count < coupon.max_uses;
+                const meetsMinOrder = !coupon.min_order || calculatedSubtotal >= coupon.min_order;
+
+                if (notExpired && underLimit && meetsMinOrder) {
+                    if (coupon.discount_type === "percentage") {
+                        calculatedDiscount = (calculatedSubtotal * coupon.discount_value) / 100;
+                    } else if (coupon.discount_type === "fixed") {
+                        calculatedDiscount = Math.min(coupon.discount_value, calculatedSubtotal);
+                    } else if (coupon.discount_type === "free_delivery") {
+                        calculatedDeliveryFee = 0;
+                    }
+                }
+            }
+        }
+
+        const calculatedTotal = Math.max(0, calculatedSubtotal - calculatedDiscount + calculatedDeliveryFee);
+
+        // Build the payload using ONLY server-calculated values
+        const payloadToInsert = {
+            restaurant_id: validatedData.restaurant_id,
+            customer_name: validatedData.customer_name,
+            customer_phone: validatedData.customer_phone,
+            customer_address: validatedData.customer_address,
+            order_type: validatedData.order_type,
+            table_number: validatedData.table_number,
+            number_of_people: validatedData.number_of_people,
+            area_name: validatedData.area_name,
+            nearest_landmark: validatedData.nearest_landmark,
+            car_details: validatedData.car_details,
+            coupon_code: validatedData.coupon_code,
+            status: 'pending',
+            subtotal: calculatedSubtotal,
+            discount_amount: calculatedDiscount,
+            delivery_fee: calculatedDeliveryFee,
+            total: calculatedTotal,
+            client_ip: clientIp !== 'unknown' ? clientIp : null,
+        };
 
         const { data, error } = await adminClient
             .from("orders")
@@ -98,11 +273,11 @@ export async function createOrder(orderData: any) {
 
         if (error) throw error;
 
-        // Insert into order_items table for Analytics
-        if (data && validatedData.items && Array.isArray(validatedData.items)) {
-            const orderItemsInsert = validatedData.items.map((item: any) => ({
+        // Insert normalized order_items
+        if (data && verifiedItems.length > 0) {
+            const orderItemsInsert = verifiedItems.map((item: any) => ({
                 order_id: data.id,
-                product_id: item.id || null, // Might be null if it's a custom fee or something, but usually a product ID
+                product_id: item.id || null,
                 quantity: item.quantity,
                 unit_price: item.price,
                 item_name: item.name,
@@ -117,45 +292,42 @@ export async function createOrder(orderData: any) {
                 .insert(orderItemsInsert);
 
             if (itemsError) {
-                console.error("[Superbase Error inserting order items]", itemsError);
-                // We don't throw an error here to prevent failing the entire order if only analytics fails,
-                // but in a strict system we might want to rollback the order.
+                // Compensating transaction: remove orphaned order if items insertion fails
+                console.error("[Supabase Error inserting order items]", itemsError);
+                await adminClient.from("orders").delete().eq("id", data.id);
+                throw new Error("فشل في حفظ تفاصيل الطلب. يرجى المحاولة مجدداً.");
             }
 
-            // Decrement Stock for each item using the RPC
-            for (const item of validatedData.items) {
-                if (item.id) {
-                    const { error: stockError } = await adminClient.rpc("decrement_stock", {
-                        p_product_id: item.id,
-                        p_quantity: item.quantity
-                    });
-
-                    if (stockError) {
-                        console.error(`[RPC Error decrement_stock for product ${item.id}]`, stockError);
-                        // Similar to analytics, we log it. If a strict e-commerce block is needed, 
-                        // this should happen before the initial order insertion.
-                    }
-                }
-            }
+            // Decrement Stock atomically (parallel)
+            await Promise.all(
+                verifiedItems
+                    .filter(item => item.id)
+                    .map(item =>
+                        adminClient.rpc("decrement_stock", {
+                            p_product_id: item.id,
+                            p_quantity: item.quantity,
+                        }).then(({ error: stockError }) => {
+                            if (stockError) {
+                                console.error(`[RPC Error decrement_stock for product ${item.id}]`, stockError);
+                            }
+                        })
+                    )
+            );
         }
 
-        // Increment coupon usage using the atomic RPC
-        if (orderData.coupon_code) {
+        // Increment coupon usage atomically
+        if (validatedData.coupon_code) {
             const { error: rpcError } = await adminClient.rpc("apply_coupon_transaction", {
-                p_coupon_code: orderData.coupon_code,
-                p_restaurant_id: orderData.restaurant_id
+                p_coupon_code: validatedData.coupon_code,
+                p_restaurant_id: validatedData.restaurant_id
             });
-
             if (rpcError) {
                 console.error("[RPC Error apply_coupon_transaction]", rpcError);
-                // We don't fail the order if coupon fails post-insertion,
-                // but we log it. Ideally, validation happens before inserting the order.
             }
         }
 
-        // --- Background Push Notification (FCM) ---
+        // FCM Push Notification
         try {
-            // 1. Get restaurant owner ID
             const { data: restaurant } = await adminClient
                 .from("restaurants")
                 .select("owner_id, name")
@@ -163,7 +335,6 @@ export async function createOrder(orderData: any) {
                 .single();
 
             if (restaurant?.owner_id) {
-                // 2. Get owner's FCM tokens
                 const { data: tokensData } = await adminClient
                     .from("fcm_tokens")
                     .select("token")
@@ -172,9 +343,9 @@ export async function createOrder(orderData: any) {
                 const fcmTokens = tokensData?.map(t => t.token) || [];
 
                 if (fcmTokens.length > 0) {
-                    const priceLabel = data.total?.toLocaleString() || '0';
-                    const typeLabel = data.order_type === 'delivery' ? '🛵 توصيل' : 
-                                     data.order_type === 'takeaway' ? '🥡 سفري' : '🍽️ محلي';
+                    const priceLabel = calculatedTotal.toLocaleString();
+                    const typeLabel = data.order_type === 'delivery' ? '🛵 توصيل' :
+                        data.order_type === 'takeaway' ? '🥡 سفري' : '🍽️ محلي';
 
                     await sendPushNotification({
                         tokens: fcmTokens,
@@ -190,7 +361,6 @@ export async function createOrder(orderData: any) {
             }
         } catch (pushError) {
             console.error("[FCM Push Error]", pushError);
-            // Don't fail the order if push fails
         }
 
         return data;
@@ -212,16 +382,37 @@ export async function updateOrderStatus(id: string, status: string) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Unauthorized");
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // Verify the order belongs to this user's restaurant
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("restaurant_id, role")
+            .eq("id", user.id)
+            .single();
+
+        if (!profile) throw new Error("Unauthorized");
+
+        // Fetch the order to verify restaurant ownership
+        const { data: order } = await supabase
+            .from("orders")
+            .select("restaurant_id")
+            .eq("id", id)
+            .single();
+
+        if (!order) throw new Error("الطلب غير موجود");
+
+        if (profile.role !== "super_admin" && order.restaurant_id !== profile.restaurant_id) {
+            throw new Error("Forbidden: لا تملك صلاحية تعديل هذا الطلب");
+        }
+
         const { data, error } = await supabase
             .from("orders")
-            .update({ status } as any)
+            .update({ status: validatedStatus } as { status: string })
             .eq("id", id)
             .select()
             .single();
 
         if (error) {
-            console.error("[Superbase Error updateOrderStatus]", error);
+            console.error("[Supabase Error updateOrderStatus]", error);
             throw new Error(error.message || "Failed to update order status in DB");
         }
         revalidatePath("/dashboard");

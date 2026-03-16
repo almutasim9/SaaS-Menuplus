@@ -1,10 +1,11 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkAddonFeatureAccess } from "@/lib/actions/addons";
 
 export type PlanType = "free" | "pro" | "business";
 
-const PLAN_LIMITS: Record<PlanType, { max_products: number; max_orders_per_month: number; max_coupons: number }> = {
+export const PLAN_LIMITS: Record<PlanType, { max_products: number; max_orders_per_month: number; max_coupons: number }> = {
     free: { max_products: 15, max_orders_per_month: 50, max_coupons: 3 },
     pro: { max_products: 100, max_orders_per_month: 500, max_coupons: 20 },
     business: { max_products: 999999, max_orders_per_month: 999999, max_coupons: 999999 },
@@ -56,7 +57,13 @@ export async function checkFeatureAccess(restaurantId: string, feature: string):
     const status = await getSubscriptionStatus(restaurantId);
     if (!status) return false;
     if (status.status === "expired" || status.status === "cancelled") return false;
-    return status.features.includes(feature);
+
+    // Step 1: plan includes the feature
+    if (status.features.includes(feature)) return true;
+
+    // Step 2: an active add-on enables the feature (only for paid plans)
+    if (status.plan === "free") return false;
+    return checkAddonFeatureAccess(restaurantId, feature);
 }
 
 export async function checkLimitAccess(restaurantId: string, resource: "products" | "orders" | "coupons"): Promise<{ allowed: boolean; current: number; max: number }> {

@@ -25,14 +25,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/client";
 import { getProducts, createProduct, updateProduct, deleteProduct, toggleProductAvailability, toggleProductVisibility, updateProductOrder, updateProductDiscount, duplicateProduct } from "@/lib/actions/products";
 import { getCategories, createCategory, updateCategory, deleteCategory, updateCategoryOrder, toggleCategoryVisibility } from "@/lib/actions/categories";
-import { Plus, GripVertical, Pencil, Trash2, EyeOff, Eye, PackageX, PackageCheck, ImageIcon, Search, ChevronDown, Check, Tag, UtensilsCrossed, Percent, Copy } from "lucide-react";
+import { Plus, GripVertical, Pencil, Trash2, EyeOff, Eye, PackageX, PackageCheck, ImageIcon, Search, ChevronDown, Check, Tag, UtensilsCrossed, Percent, Copy, Layers, PlusCircle, Settings2, Package, Info, Zap } from "lucide-react";
 import { format24to12, format12to24 } from "@/lib/time-utils";
 import { toast } from "sonner";
 import { isProductCurrentlyAvailable, type AvailabilityRule } from "@/lib/utils/availability";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Product, Category, ProductVariant, ProductAddon } from "@/lib/types/database.types";
 import { useProductAvailability, useFeatureAccess } from "@/lib/hooks/useProductScheduling";
-import { Clock, Lock, ShieldCheck } from "lucide-react";
+import { arabicToEnglishNumbers } from "@/lib/utils";
+import { Clock, Lock, ShieldCheck, Globe, Type, AlignLeft, DollarSign, Image as ImageIcon2 } from "lucide-react";
+import NextImage from "next/image";
 
 import {
     DndContext,
@@ -109,7 +111,7 @@ function SortableProductRow({
 
             <div className={`w-16 h-16 rounded-2xl bg-secondary/30 relative overflow-hidden flex-shrink-0 border border-border/10 transition-transform group-hover:scale-105 duration-300 ${(product.is_hidden || isScheduledOff) ? 'opacity-50 grayscale' : ''}`}>
                 {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                    <NextImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" width={64} height={64} unoptimized />
                 ) : (
                     <div className="flex items-center justify-center h-full bg-secondary/20">
                         <ImageIcon className="w-7 h-7 text-muted-foreground/20" />
@@ -282,6 +284,8 @@ export default function MenuItemsPage() {
 
     const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+    const [showTranslations, setShowTranslations] = useState(false);
 
     const [discountDialogOpen, setDiscountDialogOpen] = useState(false);
     const [discountProduct, setDiscountProduct] = useState<ProductWithCategory | null>(null);
@@ -748,7 +752,7 @@ export default function MenuItemsPage() {
                         <Plus className="w-4 h-4 mr-2" />
                         {t("menu.addCategory")}
                     </Button>
-                    <Button className="gradient-emerald text-white rounded-xl shadow-md" onClick={() => { setEditingProduct(null); setVariants([]); setAddons([]); setProductDialogOpen(true); }}>
+                    <Button className="gradient-emerald text-white rounded-xl shadow-md" onClick={() => { setEditingProduct(null); setVariants([]); setAddons([]); setShowTranslations(false); setProductDialogOpen(true); }}>
                         <Plus className="w-4 h-4 mr-2" />
                         {t("menu.addItem")}
                     </Button>
@@ -825,6 +829,11 @@ export default function MenuItemsPage() {
                                             setEditingProduct(p);
                                             setVariants(p.product_variants?.map(v => ({ name: v.name, name_en: v.name_en || '', name_ku: v.name_ku || '', price: v.price.toString() })) || []);
                                             setAddons(p.product_addons?.map(a => ({ name: a.name, name_en: a.name_en || '', name_ku: a.name_ku || '', price: a.price.toString() })) || []);
+                                            
+                                            // Check if any translations exist to auto-show them
+                                            const hasTranslations = !!(p.name_en || p.name_ku || p.description_en || p.description_ku);
+                                            setShowTranslations(hasTranslations);
+                                            
                                             setProductDialogOpen(true);
                                         }}
                                         onDeleteProduct={handleDeleteProduct}
@@ -874,10 +883,9 @@ export default function MenuItemsPage() {
                     </DialogHeader>
                     <form onSubmit={handleProductSubmit} className="space-y-4 mt-4">
                         <Tabs defaultValue="base" className="w-full">
-                            <TabsList className="grid w-full grid-cols-4 bg-secondary/50 rounded-xl mb-4 h-12">
+                            <TabsList className="grid w-full grid-cols-3 bg-secondary/50 rounded-xl mb-4 h-12">
                                 <TabsTrigger value="base" className="rounded-lg">{t("menu.baseInfo")}</TabsTrigger>
                                 <TabsTrigger value="variants" className="rounded-lg">{t("menu.variantsAddons")}</TabsTrigger>
-                                <TabsTrigger value="advanced" className="rounded-lg">{t("menu.advancedStock")}</TabsTrigger>
                                 <TabsTrigger value="availability" className="rounded-lg flex items-center gap-1.5 whitespace-nowrap">
                                     {t("menu.availability")}
                                     {!hasAccess && <Lock className="w-3 h-3 text-amber-500" />}
@@ -887,171 +895,320 @@ export default function MenuItemsPage() {
 
 
                             {/* TAB 1: BASE INFO */}
-                            <TabsContent value="base" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("menu.nameAr")} *</Label>
-                                        <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl h-11 bg-secondary/30 border-white/5" />
+                            <TabsContent value="base" className="space-y-6 mt-0 data-[state=inactive]:hidden" forceMount>
+                                {/* Section: Basic Info */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/50">
+                                        <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                                            <UtensilsCrossed className="w-4 h-4" />
+                                        </div>
+                                        <h4 className="font-bold text-sm uppercase tracking-wider">{t("menu.baseInfo")}</h4>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("common.category")} *</Label>
-                                        <Select name="category_id" defaultValue={editingProduct?.category_id || categories[0]?.id}>
-                                            <SelectTrigger className="rounded-xl h-11 bg-secondary/30 border-white/5">
-                                                <SelectValue placeholder={t("menu.selectCategory")} />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-xl border-white/5">
-                                                {categories.map((cat) => (
-                                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                                <Type className="w-3.5 h-3.5 text-muted-foreground" />
+                                                {t("menu.nameAr")} *
+                                            </Label>
+                                            <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl h-11 bg-secondary/30 border-white/5 focus:ring-primary/20" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                                <UtensilsCrossed className="w-3.5 h-3.5 text-muted-foreground" />
+                                                {t("common.category")} *
+                                            </Label>
+                                            <Select name="category_id" defaultValue={editingProduct?.category_id || categories[0]?.id}>
+                                                <SelectTrigger className="rounded-xl h-11 bg-secondary/30 border-white/5">
+                                                    <SelectValue placeholder={t("menu.selectCategory")} />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-xl border-white/5">
+                                                    {categories.map((cat) => (
+                                                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
+
+                                    {/* Translation Toggle Button */}
+                                    {!showTranslations && (
+                                        <div className="flex justify-center pt-2">
+                                            <Button 
+                                                type="button" 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => setShowTranslations(true)}
+                                                className="text-xs text-primary hover:bg-primary/5 rounded-xl border border-primary/20 border-dashed py-5 px-6"
+                                            >
+                                                <Plus className="w-3.5 h-3.5 mr-2" />
+                                                {t("menu.showTranslations")}
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {/* Sub-tabs for Translations */}
+                                    {showTranslations && (
+                                        <div className="bg-secondary/10 p-4 rounded-2xl border border-border/5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
+                                                <div className="flex items-center gap-2">
+                                                    <Globe className="w-4 h-4 text-muted-foreground" />
+                                                    <span className="text-xs font-bold uppercase tracking-tight text-muted-foreground">{t("menu.translations")}</span>
+                                                </div>
+                                                <Button 
+                                                    type="button" 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => setShowTranslations(false)}
+                                                    className="h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-medium text-muted-foreground">{t("menu.nameEn")} ({t("common.optional")})</Label>
+                                                    <Input name="name_en" defaultValue={editingProduct?.name_en || ""} className="rounded-xl h-10 bg-background/50 border-white/5 text-sm" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-medium text-muted-foreground">{t("menu.nameKu")} ({t("common.optional")})</Label>
+                                                    <Input name="name_ku" defaultValue={editingProduct?.name_ku || ""} className="rounded-xl h-10 bg-background/50 border-white/5 text-sm" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
+                                {/* Section: Description */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/50">
+                                        <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                                            <AlignLeft className="w-4 h-4" />
+                                        </div>
+                                        <h4 className="font-bold text-sm uppercase tracking-wider">{t("common.description")}</h4>
+                                    </div>
 
-                                <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("menu.nameEn")} <span className="text-muted-foreground font-normal text-xs">({t("common.optional")})</span></Label>
-                                        <Input name="name_en" defaultValue={editingProduct?.name_en || ""} className="rounded-xl h-11 bg-secondary/30 border-white/5" />
+                                        <Label className="text-sm font-semibold">{t("menu.descAr")}</Label>
+                                        <Textarea name="description" defaultValue={editingProduct?.description || ""} className="rounded-xl bg-secondary/30 border-white/5 resize-none min-h-[80px]" rows={2} />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("menu.nameKu")} <span className="text-muted-foreground font-normal text-xs">({t("common.optional")})</span></Label>
-                                        <Input name="name_ku" defaultValue={editingProduct?.name_ku || ""} className="rounded-xl h-11 bg-secondary/30 border-white/5" />
-                                    </div>
+
+                                    {showTranslations && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-medium text-muted-foreground">{t("menu.descEn")} ({t("common.optional")})</Label>
+                                                <Textarea name="description_en" defaultValue={editingProduct?.description_en || ""} className="rounded-xl bg-secondary/20 border-white/5 text-sm" rows={2} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-medium text-muted-foreground">{t("menu.descKu")} ({t("common.optional")})</Label>
+                                                <Textarea name="description_ku" defaultValue={editingProduct?.description_ku || ""} className="rounded-xl bg-secondary/20 border-white/5 text-sm" rows={2} />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold">{t("menu.descAr")}</Label>
-                                    <Textarea name="description" defaultValue={editingProduct?.description || ""} className="rounded-xl bg-secondary/30 border-white/5 resize-none" rows={3} />
+                                {/* Section: Price & Image */}
+                                <div className="space-y-4 pt-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                                <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                                                {t("common.price")} ({t("storefront.currency")}) *
+                                            </Label>
+                                            <div className="relative">
+                                                <Input name="price" type="text" defaultValue={editingProduct?.price} onChange={(e) => e.target.value = arabicToEnglishNumbers(e.target.value)} required className="rounded-xl h-11 bg-secondary/30 border-white/5 pr-12 font-bold text-lg" />
+                                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground bg-white/5 px-2 py-1 rounded-md">
+                                                    {t("storefront.currency")}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold flex items-center gap-2">
+                                                <ImageIcon2 className="w-3.5 h-3.5 text-blue-500" />
+                                                {t("common.image")}
+                                            </Label>
+                                            <div className="relative group">
+                                                <div className="absolute inset-0 bg-primary/5 rounded-xl border-2 border-dashed border-primary/20 group-hover:bg-primary/10 group-hover:border-primary/40 transition-all pointer-events-none flex flex-col items-center justify-center">
+                                                    <Plus className="w-5 h-5 text-primary/40 mb-1" />
+                                                    <span className="text-[10px] uppercase font-bold text-primary/60 tracking-widest">{t("common.upload") || "رفع صورة"}</span>
+                                                </div>
+                                                <Input name="image" type="file" accept="image/*" className="rounded-xl h-14 bg-transparent border-none opacity-0 cursor-pointer relative z-10" />
+                                            </div>
+                                            {editingProduct?.image_url && (
+                                                <div className="flex items-center gap-2 mt-2 p-2 bg-secondary/20 rounded-xl border border-white/5">
+                                                    <NextImage src={editingProduct.image_url} alt={editingProduct.name} className="w-10 h-10 rounded-lg object-cover" width={40} height={40} unoptimized />
+                                                    <span className="text-[10px] text-muted-foreground truncate flex-1">الصورة الحالية</span>
+                                                </div>
+                                            )}
+                                    </div>
                                 </div>
+                            </div>
 
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>{t("menu.descEn")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
-                                        <Textarea name="description_en" defaultValue={editingProduct?.description_en || ""} className="rounded-xl bg-secondary/50" rows={2} />
+                            {/* Status Section (Added since Advanced was removed) */}
+                                <div className="p-4 rounded-xl bg-secondary/10 border border-border/5 space-y-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500">
+                                            <Eye className="w-4 h-4" />
+                                        </div>
+                                        <Label className="text-sm font-bold">{t("common.status")}</Label>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>{t("menu.descKu")} <span className="text-muted-foreground text-xs">({t("common.optional")})</span></Label>
-                                        <Textarea name="description_ku" defaultValue={editingProduct?.description_ku || ""} className="rounded-xl bg-secondary/50" rows={2} />
+                                    
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8">
+                                        <div className="flex items-center gap-3 bg-background/40 p-2 pr-4 rounded-xl border border-white/5 min-w-[140px]">
+                                            <Switch 
+                                                id="available" 
+                                                defaultChecked={editingProduct?.is_available ?? true} 
+                                                onCheckedChange={(checked) => {
+                                                    const el = document.getElementById('is_available_input') as HTMLInputElement;
+                                                    if (el) el.value = checked.toString();
+                                                }}
+                                            />
+                                            <Label htmlFor="available" className="font-bold text-xs cursor-pointer">{t("menu.available")}</Label>
+                                            <input type="hidden" name="is_available" id="is_available_input" value={(editingProduct?.is_available ?? true).toString()} />
+                                        </div>
+
+                                        <div className="flex items-center gap-3 bg-background/40 p-2 pr-4 rounded-xl border border-white/5 min-w-[140px] border-dashed">
+                                            <Switch 
+                                                id="hidden" 
+                                                defaultChecked={editingProduct?.is_hidden ?? false} 
+                                                onCheckedChange={(checked) => {
+                                                    const el = document.getElementById('is_hidden_input') as HTMLInputElement;
+                                                    if (el) el.value = checked.toString();
+                                                }}
+                                            />
+                                            <Label htmlFor="hidden" className="font-bold text-xs cursor-pointer">{t("menu.hiddenFromMenu")}</Label>
+                                            <input type="hidden" name="is_hidden" id="is_hidden_input" value={(editingProduct?.is_hidden ?? false).toString()} />
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("common.price")} ({t("storefront.currency")}) *</Label>
-                                        <Input name="price" type="number" step="1" min="0" defaultValue={editingProduct?.price} required className="rounded-xl h-11 bg-secondary/30 border-white/5" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">{t("common.image")}</Label>
-                                        <Input name="image" type="file" accept="image/*" className="rounded-xl h-11 bg-secondary/30 border-white/5 file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-foreground file:text-sm" />
-                                    </div>
-                                </div>
-
                             </TabsContent>
 
                             {/* TAB 2: VARIANTS AND ADDONS */}
-                            <TabsContent value="variants" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
+                            <TabsContent value="variants" className="space-y-6 mt-0 data-[state=inactive]:hidden" forceMount>
                                 {/* Variants Section */}
-                                <div className="space-y-3 border border-border/10 p-5 rounded-2xl bg-secondary/10">
-                                    <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-4 border border-border/40 p-6 rounded-2xl bg-secondary/5">
+                                    <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-1">
-                                            <Label className="text-base font-bold text-primary">{t("menu.variants")}</Label>
-                                            <p className="text-xs text-muted-foreground/70">{t("menu.variantsDesc")}</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-500">
+                                                    <Layers className="w-4 h-4" />
+                                                </div>
+                                                <Label className="text-base font-bold text-primary">{t("menu.variants")}</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{t("menu.mustSelectOne")}</span>
+                                                <p className="text-[11px] text-muted-foreground/70">{t("menu.variantsDesc")}</p>
+                                            </div>
                                         </div>
 
-                                        <Button type="button" variant="outline" size="sm" onClick={() => setVariants([...variants, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-8 text-xs rounded-lg">
-                                            <Plus className="w-3 h-3 mr-1" /> {t("common.add")} {t("menu.variants")}
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setVariants([...variants, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-8 text-xs rounded-lg border-indigo-500/20 hover:bg-indigo-500/5 hover:text-indigo-500 transition-colors">
+                                            <Plus className="w-3 h-3 mr-1" /> {t("common.add")}
                                         </Button>
                                     </div>
-                                    {variants.map((v, i) => (
-                                        <div key={i} className="flex gap-2 items-center">
-                                            <Input placeholder={t("menu.nameAr") + " *"} value={v.name} onChange={e => { const newV = [...variants]; newV[i].name = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-32" required />
-                                            <Input placeholder={`${t("menu.nameEn")} (${t("common.optional")})`} value={v.name_en || ''} onChange={e => { const newV = [...variants]; newV[i].name_en = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
-                                            <Input placeholder={`${t("menu.nameKu")} (${t("common.optional")})`} value={v.name_ku || ''} onChange={e => { const newV = [...variants]; newV[i].name_ku = e.target.value; setVariants(newV); }} className="rounded-lg bg-background w-28" />
-                                            <div className="relative w-28">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                                                <Input type="number" step="0.01" min="0" value={v.price} onChange={e => { const newV = [...variants]; newV[i].price = e.target.value; setVariants(newV); }} className="pl-7 rounded-lg bg-background" required />
+
+                                    <div className="space-y-3">
+                                        {variants.map((v, i) => (
+                                            <div key={i} className="group relative bg-background/40 hover:bg-background/60 p-3 rounded-xl border border-white/5 transition-all">
+                                                <div className="flex gap-3 items-center">
+                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold text-muted-foreground/60 uppercase">{t("menu.nameAr")}</Label>
+                                                            <Input placeholder={t("menu.nameAr") + " *"} value={v.name} onChange={e => { const newV = [...variants]; newV[i].name = e.target.value; setVariants(newV); }} className="rounded-lg h-9 bg-background/50 border-white/5" required />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold text-muted-foreground/60 uppercase">{t("common.price")} ({t("storefront.currency")})</Label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">{t("storefront.currency")}</span>
+                                                                <Input type="text" value={v.price} onChange={e => { const newV = [...variants]; newV[i].price = arabicToEnglishNumbers(e.target.value); setVariants(newV); }} className="pl-10 rounded-lg h-9 bg-background/50 border-white/5 font-bold" required />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => setVariants(variants.filter((_, idx) => idx !== i))} className="h-8 w-8 rounded-full hover:bg-destructive/10 text-destructive/40 hover:text-destructive self-end mb-0.5">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+
+                                                {showTranslations && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-[10px] font-medium text-muted-foreground/50">{t("menu.nameEn")}</Label>
+                                                            <Input value={v.name_en || ''} onChange={e => { const newV = [...variants]; newV[i].name_en = e.target.value; setVariants(newV); }} className="rounded-md h-8 text-xs bg-background/30 border-white/5" />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-[10px] font-medium text-muted-foreground/50">{t("menu.nameKu")}</Label>
+                                                            <Input value={v.name_ku || ''} onChange={e => { const newV = [...variants]; newV[i].name_ku = e.target.value; setVariants(newV); }} className="rounded-md h-8 text-xs bg-background/30 border-white/5" />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => setVariants(variants.filter((_, idx) => idx !== i))}>
-                                                <Trash2 className="w-4 h-4 text-destructive" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                     <input type="hidden" name="variants" value={JSON.stringify(variants)} />
                                 </div>
 
                                 {/* Addons Section */}
-                                <div className="space-y-3 border border-border/50 p-4 rounded-xl bg-secondary/20">
-                                    <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-4 border border-border/40 p-6 rounded-2xl bg-secondary/5">
+                                    <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-1">
-                                            <Label className="text-base font-bold text-primary">{t("menu.addons")}</Label>
-                                            <p className="text-xs text-muted-foreground/70">{t("menu.addonsDesc")}</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500">
+                                                    <PlusCircle className="w-4 h-4" />
+                                                </div>
+                                                <Label className="text-base font-bold text-primary">{t("menu.addons")}</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{t("menu.optionalAddons")}</span>
+                                                <p className="text-[11px] text-muted-foreground/70">{t("menu.addonsDesc")}</p>
+                                            </div>
                                         </div>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => setAddons([...addons, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-9 text-xs rounded-xl border-dashed">
-                                            <Plus className="w-4 h-4 mr-1" /> {t("common.add")}
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setAddons([...addons, { name: '', name_en: '', name_ku: '', price: '0' }])} className="h-8 text-xs rounded-lg border-emerald-500/20 hover:bg-emerald-500/5 hover:text-emerald-500 transition-colors">
+                                            <Plus className="w-3 h-3 mr-1" /> {t("common.add")}
                                         </Button>
                                     </div>
 
-                                    {addons.map((a, i) => (
-                                        <div key={i} className="flex gap-2 items-center">
-                                            <Input placeholder={t("menu.nameAr") + " *"} value={a.name} onChange={e => { const newA = [...addons]; newA[i].name = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-32" required />
-                                            <Input placeholder={`${t("menu.nameEn")} (${t("common.optional")})`} value={a.name_en || ''} onChange={e => { const newA = [...addons]; newA[i].name_en = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
-                                            <Input placeholder={`${t("menu.nameKu")} (${t("common.optional")})`} value={a.name_ku || ''} onChange={e => { const newA = [...addons]; newA[i].name_ku = e.target.value; setAddons(newA); }} className="rounded-lg bg-background w-28" />
-                                            <div className="relative w-28">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+$</span>
-                                                <Input type="number" step="0.01" min="0" value={a.price} onChange={e => { const newA = [...addons]; newA[i].price = e.target.value; setAddons(newA); }} className="pl-7 rounded-lg bg-background" required />
+                                    <div className="space-y-3">
+                                        {addons.map((a, i) => (
+                                            <div key={i} className="group relative bg-background/40 hover:bg-background/60 p-3 rounded-xl border border-white/5 transition-all">
+                                                <div className="flex gap-3 items-center">
+                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold text-muted-foreground/60 uppercase">{t("menu.nameAr")}</Label>
+                                                            <Input placeholder={t("menu.nameAr") + " *"} value={a.name} onChange={e => { const newA = [...addons]; newA[i].name = e.target.value; setAddons(newA); }} className="rounded-lg h-9 bg-background/50 border-white/5" required />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold text-muted-foreground/60 uppercase">{t("common.price")} (+)</Label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">+{t("storefront.currency")}</span>
+                                                                <Input type="text" value={a.price} onChange={e => { const newA = [...addons]; newA[i].price = arabicToEnglishNumbers(e.target.value); setAddons(newA); }} className="pl-10 rounded-lg h-9 bg-background/50 border-white/5 font-bold" required />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => setAddons(addons.filter((_, idx) => idx !== i))} className="h-8 w-8 rounded-full hover:bg-destructive/10 text-destructive/40 hover:text-destructive self-end mb-0.5">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+
+                                                {showTranslations && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/5 animate-in fade-in slide-in-from-top-1">
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-[10px] font-medium text-muted-foreground/50">{t("menu.nameEn")}</Label>
+                                                            <Input value={a.name_en || ''} onChange={e => { const newA = [...addons]; newA[i].name_en = e.target.value; setAddons(newA); }} className="rounded-md h-8 text-xs bg-background/30 border-white/5" />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <Label className="text-[10px] font-medium text-muted-foreground/50">{t("menu.nameKu")}</Label>
+                                                            <Input value={a.name_ku || ''} onChange={e => { const newA = [...addons]; newA[i].name_ku = e.target.value; setAddons(newA); }} className="rounded-md h-8 text-xs bg-background/30 border-white/5" />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => setAddons(addons.filter((_, idx) => idx !== i))}>
-                                                <Trash2 className="w-4 h-4 text-destructive" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                     <input type="hidden" name="addons" value={JSON.stringify(addons)} />
                                 </div>
                             </TabsContent>
 
-                            {/* TAB 3: ADVANCED & STOCK */}
-                            <TabsContent value="advanced" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
-                                <div className="space-y-4 p-5 rounded-2xl bg-secondary/10 border border-border/10">
-                                    <h4 className="font-bold text-sm text-primary uppercase tracking-wider">{t("menu.advancedSettings")}</h4>
-                                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                                        <p className="text-xs text-muted-foreground leading-relaxed">
-                                            {t("menu.advancedSettingsDesc") || "إعدادات إضافية للمنتج مثل الوسوم والتوفر."}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-8 p-5 rounded-2xl bg-secondary/10 border border-border/10 mt-4">
-                                    <div className="flex items-center gap-3">
-                                        <Switch 
-                                            id="available" 
-                                            defaultChecked={editingProduct?.is_available ?? true} 
-                                            onCheckedChange={(checked) => {
-                                                const el = document.getElementById('is_available_input') as HTMLInputElement;
-                                                if (el) el.value = checked.toString();
-                                            }}
-                                        />
-                                        <Label htmlFor="available" className="font-bold cursor-pointer">{t("menu.available")}</Label>
-                                        <input type="hidden" name="is_available" id="is_available_input" value={(editingProduct?.is_available ?? true).toString()} />
-                                    </div>
-                                    <div className="w-px h-8 bg-border/20" />
-                                    <div className="flex items-center gap-3">
-                                        <Switch 
-                                            id="hidden" 
-                                            defaultChecked={editingProduct?.is_hidden ?? false} 
-                                            onCheckedChange={(checked) => {
-                                                const el = document.getElementById('is_hidden_input') as HTMLInputElement;
-                                                if (el) el.value = checked.toString();
-                                            }}
-                                        />
-                                        <Label htmlFor="hidden" className="font-bold cursor-pointer">{t("menu.hiddenFromMenu")}</Label>
-                                        <input type="hidden" name="is_hidden" id="is_hidden_input" value={(editingProduct?.is_hidden ?? false).toString()} />
-                                    </div>
-                                </div>
-
-                            </TabsContent>
 
                             {/* TAB 4: AVAILABILITY (SCHEDULING) */}
                             <TabsContent value="availability" className="space-y-4 mt-0 data-[state=inactive]:hidden" forceMount>
@@ -1237,7 +1394,7 @@ export default function MenuItemsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Value</Label>
-                                <Input name="discount_value" type="number" step="0.01" min="0" required placeholder="e.g. 10" className="rounded-xl bg-secondary/50" />
+                                <Input name="discount_value" type="text" onChange={(e) => e.target.value = arabicToEnglishNumbers(e.target.value)} required placeholder="e.g. 10" className="rounded-xl bg-secondary/50" />
                             </div>
                         </div>
                         <Button type="submit" className="w-full gradient-emerald text-white rounded-xl">
@@ -1291,10 +1448,9 @@ export default function MenuItemsPage() {
                                 <div className="space-y-2">
                                     <Label>السعر بعد الخصم (د.ع)</Label>
                                     <Input
-                                        type="number" step="1" min="1"
-                                        max={(Number(itemDiscountProduct?.price) || 0) - 1 || undefined}
+                                        type="text"
                                         value={discountNewPrice}
-                                        onChange={e => setDiscountNewPrice(e.target.value)}
+                                        onChange={e => setDiscountNewPrice(arabicToEnglishNumbers(e.target.value))}
                                         placeholder={`أقل من ${Number(itemDiscountProduct?.price || 0).toFixed(0)}`}
                                         className="rounded-xl bg-secondary/50"
                                         required
@@ -1312,9 +1468,9 @@ export default function MenuItemsPage() {
                                 <div className="space-y-2">
                                     <Label>نسبة الخصم (%)</Label>
                                     <Input
-                                        type="number" step="1" min="1" max="99"
+                                        type="text"
                                         value={discountPercent}
-                                        onChange={e => setDiscountPercent(e.target.value)}
+                                        onChange={e => setDiscountPercent(arabicToEnglishNumbers(e.target.value))}
                                         placeholder="مثال: 20"
                                         className="rounded-xl bg-secondary/50"
                                         required

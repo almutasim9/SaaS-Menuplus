@@ -108,6 +108,28 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
+    // Apply HTTP Security Headers to all responses
+    supabaseResponse.headers.set("X-Frame-Options", "DENY");
+    supabaseResponse.headers.set("X-Content-Type-Options", "nosniff");
+    supabaseResponse.headers.set("X-XSS-Protection", "1; mode=block");
+    supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    supabaseResponse.headers.set(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()"
+    );
+    supabaseResponse.headers.set(
+        "Content-Security-Policy",
+        [
+            "default-src 'self'",
+            "img-src 'self' data: blob: https:",
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self' data: https:",
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://fcm.googleapis.com",
+            "frame-ancestors 'none'",
+        ].join("; ")
+    );
+
     return supabaseResponse;
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getAllRestaurants, updateRestaurantPlan, suspendRestaurant, activateRestaurant } from "@/lib/actions/admin";
+import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { getAllRestaurants, updateRestaurantPlan, suspendRestaurant, activateRestaurant, exportRestaurants, getGovernorates, getLocationsByGovernorate } from "@/lib/actions/admin";
 import {
     Store,
     Search,
@@ -17,10 +18,16 @@ import {
     Mail,
     Lock,
     UtensilsCrossed,
-    CreditCard,
     Loader2,
     Eye,
     EyeOff,
+    MapPin,
+    Navigation,
+    Download,
+    ChevronLeft,
+    ChevronRight,
+    Filter,
+    SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -62,6 +69,10 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [slugEdited, setSlugEdited] = useState(false);
+    
+    const [governorates, setGovernorates] = useState<any[]>([]);
+    const [cities, setCities] = useState<any[]>([]);
+    
     const [form, setForm] = useState({
         ownerName: "",
         ownerEmail: "",
@@ -69,7 +80,15 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
         restaurantName: "",
         slug: "",
         plan: "free",
+        governorate: "",
+        city: "",
     });
+
+    useEffect(() => {
+        if (open) {
+            getGovernorates().then(setGovernorates);
+        }
+    }, [open]);
 
     const toSlug = (val: string) =>
         val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "restaurant";
@@ -81,6 +100,22 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
                 restaurantName: value,
                 slug: slugEdited ? prev.slug : toSlug(value),
             }));
+        } else if (key === "governorate") {
+            setForm(prev => ({ ...prev, governorate: value, city: "" }));
+            // Fetch cities for this governorate
+            const gov = governorates.find(g => g.name_ar === value);
+            if (gov) {
+                // Actually the Excel logic had Districts linked to Governorates.
+                // But wait, my populateDeliveryZones uses city equality?
+                // I'll fetch locations for the selected governorate to show as "Cities"
+                getLocationsByGovernorate(gov.id).then(locs => {
+                    // Extract unique city names if available, or just use areas as cities
+                    // Given the excel, I'll show unique Districts (areas) as cities.
+                    setCities(locs);
+                });
+            } else {
+                setCities([]);
+            }
         } else {
             setForm(prev => ({ ...prev, [key]: value }));
         }
@@ -99,6 +134,7 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
         if (form.ownerPassword.length < 6) { toast.error("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
         if (!form.restaurantName.trim()) { toast.error("أدخل اسم المطعم"); return; }
         if (!form.slug.trim()) { toast.error("أدخل رابط المطعم"); return; }
+        if (!form.governorate) { toast.error("اختر محافظة المطعم"); return; }
 
         setLoading(true);
 
@@ -118,7 +154,7 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
             }
 
             toast.success(`تم إنشاء مطعم "${form.restaurantName}" بنجاح!`);
-            setForm({ ownerName: "", ownerEmail: "", ownerPassword: "", restaurantName: "", slug: "", plan: "free" });
+            setForm({ ownerName: "", ownerEmail: "", ownerPassword: "", restaurantName: "", slug: "", plan: "free", governorate: "", city: "" });
             setSlugEdited(false);
             setStep(1);
             onCreated();
@@ -226,9 +262,47 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
                     ) : (
                         <>
                             {/* Step 2: Restaurant Info & Plan */}
-                            <p className="text-xs text-gray-400 font-medium">معلومات المطعم والخطة</p>
+                            <p className="text-xs text-gray-400 font-medium">معلومات المطعم والموقع</p>
 
                             <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-300 mb-1.5 block">المحافظة</label>
+                                        <div className="relative">
+                                            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                            <select
+                                                value={form.governorate}
+                                                onChange={e => update("governorate", e.target.value)}
+                                                className="w-full h-11 pr-10 pl-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm focus:outline-none focus:border-emerald-500/50 transition-colors appearance-none"
+                                            >
+                                                <option value="" disabled className="bg-[#141414]">اختر المحافظة</option>
+                                                {governorates.map(g => (
+                                                    <option key={g.id} value={g.name_ar} className="bg-[#141414]">{g.name_ar}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-300 mb-1.5 block">المدينة (اختياري)</label>
+                                        <div className="relative">
+                                            <Navigation className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                            <select
+                                                value={form.city}
+                                                onChange={e => update("city", e.target.value)}
+                                                disabled={!form.governorate}
+                                                className="w-full h-11 pr-10 pl-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm focus:outline-none focus:border-emerald-500/50 transition-colors appearance-none disabled:opacity-50"
+                                            >
+                                                <option value="" className="bg-[#141414]">{form.governorate ? "كل المدن" : "اختر المحافظة أولاً"}</option>
+                                                {/* In a real app we might want unique city names, but here we'll just show what's available */}
+                                                {Array.from(new Set(cities.map(c => c.city_name_ar))).map(cityName => (
+                                                    <option key={cityName} value={cityName} className="bg-[#141414]">{cityName}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="text-xs font-medium text-gray-300 mb-1.5 block">اسم المطعم</label>
                                     <div className="relative">
@@ -350,23 +424,85 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
     );
 }
 
+const statusLabels: Record<string, string> = {
+    active: "نشط",
+    trial: "تجريبي",
+    expired: "منتهي",
+    cancelled: "ملغي",
+};
+
+const planLabels: Record<string, string> = {
+    free: "مجاني",
+    pro: "احترافي",
+    business: "أعمال",
+};
+
 // ==========================================
 // Main Page
 // ==========================================
 export default function AdminRestaurantsPage() {
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+    const [total, setTotal] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
+
+    // Filters
     const [search, setSearch] = useState("");
     const [filterPlan, setFilterPlan] = useState("all");
-    const [showAddModal, setShowAddModal] = useState(false);
+    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterJoined, setFilterJoined] = useState("");
+    const [sortBy, setSortBy] = useState("created_at");
+    const [page, setPage] = useState(1);
 
-    const loadRestaurants = async () => {
-        const data = await getAllRestaurants();
-        setRestaurants(data as Restaurant[]);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const loadRestaurants = useCallback(async (overrides?: {
+        search?: string; plan?: string; status?: string;
+        joined?: string; sort?: string; pg?: number;
+    }) => {
+        setLoading(true);
+        const result = await getAllRestaurants({
+            search: overrides?.search ?? search,
+            plan: overrides?.plan ?? filterPlan,
+            status: overrides?.status ?? filterStatus,
+            joinedWithin: overrides?.joined ?? filterJoined,
+            sortBy: overrides?.sort ?? sortBy,
+            page: overrides?.pg ?? page,
+            pageSize: 20,
+        });
+        setRestaurants(result.data as Restaurant[]);
+        setTotal(result.total);
+        setTotalPages(result.totalPages);
         setLoading(false);
-    };
+    }, [search, filterPlan, filterStatus, filterJoined, sortBy, page]);
 
     useEffect(() => { loadRestaurants(); }, []);
+
+    const applyFilter = (key: string, value: string) => {
+        const next = { plan: filterPlan, status: filterStatus, joined: filterJoined, sort: sortBy, pg: 1 };
+        if (key === "plan") { setFilterPlan(value); next.plan = value; }
+        if (key === "status") { setFilterStatus(value); next.status = value; }
+        if (key === "joined") { setFilterJoined(value); next.joined = value; }
+        if (key === "sort") { setSortBy(value); next.sort = value; }
+        setPage(1);
+        loadRestaurants({ ...next, search });
+    };
+
+    const onSearchChange = (val: string) => {
+        setSearch(val);
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(() => {
+            setPage(1);
+            loadRestaurants({ search: val, pg: 1 });
+        }, 350);
+    };
+
+    const goToPage = (pg: number) => {
+        setPage(pg);
+        loadRestaurants({ pg });
+    };
 
     const handleSuspend = async (id: string) => {
         const result = await suspendRestaurant(id);
@@ -385,65 +521,131 @@ export default function AdminRestaurantsPage() {
     const handleChangePlan = async (id: string, plan: string) => {
         const result = await updateRestaurantPlan(id, plan);
         if (result.error) { toast.error(result.error); return; }
-        toast.success(`تم تغيير الخطة إلى ${plan}`);
+        toast.success(`تم تغيير الخطة إلى ${planLabels[plan] || plan}`);
         setRestaurants(prev => prev.map(r => r.id === id ? { ...r, subscription_plan: plan } : r));
     };
 
-    const filtered = restaurants.filter(r => {
-        const matchesSearch = r.name.toLowerCase().includes(search.toLowerCase()) || r.slug.includes(search.toLowerCase());
-        const matchesPlan = filterPlan === "all" || (r.subscription_plan || "free") === filterPlan;
-        return matchesSearch && matchesPlan;
-    });
-
-    if (loading) {
-        return (
-            <div className="space-y-6">
-                <div className="h-8 w-48 bg-secondary/50 rounded-xl animate-pulse" />
-                {[1, 2, 3].map(i => <div key={i} className="h-20 bg-secondary/30 rounded-2xl animate-pulse" />)}
-            </div>
-        );
-    }
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            const rows = await exportRestaurants();
+            const XLSX = (await import("xlsx")).default;
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "المطاعم");
+            XLSX.writeFile(wb, `restaurants-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            toast.success("تم تصدير البيانات بنجاح");
+        } catch {
+            toast.error("فشل التصدير");
+        }
+        setExporting(false);
+    };
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-3">
                         <Store className="w-7 h-7" />
                         إدارة المطاعم
                     </h1>
-                    <p className="text-muted-foreground mt-1">{restaurants.length} مطعم مسجل على المنصة.</p>
+                    <p className="text-muted-foreground mt-1">{total} مطعم مسجل على المنصة.</p>
                 </div>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-sm transition-colors flex items-center gap-2"
-                >
-                    <Plus className="w-4 h-4" />
-                    إضافة مطعم
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting}
+                        className="h-10 px-4 rounded-xl bg-secondary/50 hover:bg-secondary/80 border border-border/40 text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        تصدير Excel
+                    </button>
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="h-10 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-sm transition-colors flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        إضافة مطعم
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="ابحث بالاسم أو الرابط..."
-                        className="w-full h-11 pl-10 pr-4 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none focus:border-primary/50"
-                    />
+            <div className="glass-card rounded-2xl p-4 border border-border/40">
+                <div className="flex items-center gap-2 mb-3">
+                    <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">الفلاتر والترتيب</span>
                 </div>
-                <select
-                    value={filterPlan}
-                    onChange={e => setFilterPlan(e.target.value)}
-                    className="h-11 px-4 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none"
-                >
-                    <option value="all">كل الخطط</option>
-                    <option value="free">Free</option>
-                    <option value="pro">Pro</option>
-                    <option value="business">Business</option>
-                </select>
+                <div className="flex flex-wrap gap-3">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-48">
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                            value={search}
+                            onChange={e => onSearchChange(e.target.value)}
+                            placeholder="ابحث بالاسم أو الرابط..."
+                            className="w-full h-10 pr-10 pl-4 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none focus:border-primary/50"
+                        />
+                    </div>
+                    {/* Plan */}
+                    <select
+                        value={filterPlan}
+                        onChange={e => applyFilter("plan", e.target.value)}
+                        className="h-10 px-3 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none"
+                    >
+                        <option value="all">كل الخطط</option>
+                        <option value="free">مجاني</option>
+                        <option value="pro">احترافي</option>
+                        <option value="business">أعمال</option>
+                    </select>
+                    {/* Status */}
+                    <select
+                        value={filterStatus}
+                        onChange={e => applyFilter("status", e.target.value)}
+                        className="h-10 px-3 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none"
+                    >
+                        <option value="all">كل الحالات</option>
+                        <option value="active">نشط</option>
+                        <option value="trial">تجريبي</option>
+                        <option value="expired">منتهي</option>
+                        <option value="cancelled">ملغي</option>
+                    </select>
+                    {/* Joined Within */}
+                    <select
+                        value={filterJoined}
+                        onChange={e => applyFilter("joined", e.target.value)}
+                        className="h-10 px-3 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none"
+                    >
+                        <option value="">كل الأوقات</option>
+                        <option value="7">آخر 7 أيام</option>
+                        <option value="30">آخر 30 يوم</option>
+                        <option value="90">آخر 90 يوم</option>
+                    </select>
+                    {/* Sort */}
+                    <select
+                        value={sortBy}
+                        onChange={e => applyFilter("sort", e.target.value)}
+                        className="h-10 px-3 rounded-xl bg-secondary/30 border border-border/40 text-sm focus:outline-none"
+                    >
+                        <option value="created_at">الأحدث أولاً</option>
+                        <option value="name">الاسم (أ-ي)</option>
+                    </select>
+                    {/* Clear Filters */}
+                    {(filterPlan !== "all" || filterStatus !== "all" || filterJoined || search) && (
+                        <button
+                            onClick={() => {
+                                setSearch(""); setFilterPlan("all"); setFilterStatus("all");
+                                setFilterJoined(""); setSortBy("created_at"); setPage(1);
+                                loadRestaurants({ search: "", plan: "all", status: "all", joined: "", sort: "created_at", pg: 1 });
+                            }}
+                            className="h-10 px-3 rounded-xl border border-border/40 text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                            مسح
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Table */}
@@ -451,16 +653,25 @@ export default function AdminRestaurantsPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b border-border/30">
-                                <th className="text-right px-5 py-3 text-muted-foreground font-medium">المطعم</th>
-                                <th className="text-right px-5 py-3 text-muted-foreground font-medium">الخطة</th>
-                                <th className="text-right px-5 py-3 text-muted-foreground font-medium">الحالة</th>
-                                <th className="text-right px-5 py-3 text-muted-foreground font-medium">تاريخ الانضمام</th>
-                                <th className="text-right px-5 py-3 text-muted-foreground font-medium">إجراءات</th>
+                            <tr className="border-b border-border/30 bg-secondary/10">
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">المطعم</th>
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">الخطة</th>
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">الحالة</th>
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">الصاحب</th>
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">تاريخ الانضمام</th>
+                                <th className="text-right px-5 py-3.5 text-muted-foreground font-medium">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(r => {
+                            {loading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i} className="border-b border-border/10">
+                                        <td className="px-5 py-4" colSpan={6}>
+                                            <div className="h-5 bg-secondary/30 rounded-lg animate-pulse" />
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : restaurants.map(r => {
                                 const plan = (r.subscription_plan || "free") as string;
                                 const status = (r.subscription_status || "active") as string;
                                 const PlanIcon = planIcons[plan] || Zap;
@@ -469,7 +680,7 @@ export default function AdminRestaurantsPage() {
                                         <td className="px-5 py-4">
                                             <div>
                                                 <p className="font-semibold">{r.name}</p>
-                                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                                     /{r.slug}
                                                     <a href={`/menu/${r.slug}`} target="_blank" className="hover:text-primary">
                                                         <ExternalLink className="w-3 h-3" />
@@ -480,28 +691,42 @@ export default function AdminRestaurantsPage() {
                                         <td className="px-5 py-4">
                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${planColors[plan] || planColors.free}`}>
                                                 <PlanIcon className="w-3 h-3" />
-                                                {plan}
+                                                {planLabels[plan] || plan}
                                             </span>
                                         </td>
                                         <td className="px-5 py-4">
                                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${statusColors[status] || statusColors.active}`}>
                                                 {status === "active" ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
-                                                {status}
+                                                {statusLabels[status] || status}
                                             </span>
                                         </td>
-                                        <td className="px-5 py-4 text-muted-foreground">
+                                        <td className="px-5 py-4">
+                                            {r.profiles ? (
+                                                <div>
+                                                    <p className="text-sm">{r.profiles.full_name || "—"}</p>
+                                                    <p className="text-xs text-muted-foreground">{r.profiles.email}</p>
+                                                </div>
+                                            ) : <span className="text-muted-foreground text-xs">—</span>}
+                                        </td>
+                                        <td className="px-5 py-4 text-muted-foreground text-sm">
                                             {new Date(r.created_at).toLocaleDateString("ar-IQ")}
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-2">
+                                                <Link
+                                                    href={`/admin/restaurants/${r.id}`}
+                                                    className="h-8 px-3 rounded-lg bg-secondary/30 border border-border/40 text-xs hover:bg-secondary/60 transition-colors flex items-center"
+                                                >
+                                                    تفاصيل
+                                                </Link>
                                                 <select
                                                     value={plan}
                                                     onChange={e => handleChangePlan(r.id, e.target.value)}
                                                     className="h-8 px-2 rounded-lg bg-secondary/30 border border-border/40 text-xs"
                                                 >
-                                                    <option value="free">Free</option>
-                                                    <option value="pro">Pro</option>
-                                                    <option value="business">Business</option>
+                                                    <option value="free">مجاني</option>
+                                                    <option value="pro">احترافي</option>
+                                                    <option value="business">أعمال</option>
                                                 </select>
                                                 {status === "active" ? (
                                                     <button onClick={() => handleSuspend(r.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors" title="تعليق">
@@ -520,17 +745,51 @@ export default function AdminRestaurantsPage() {
                         </tbody>
                     </table>
                 </div>
-                {filtered.length === 0 && (
+                {!loading && restaurants.length === 0 && (
                     <div className="text-center py-16 text-muted-foreground">
                         <Store className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p className="text-sm">لا توجد مطاعم مسجلة بعد.</p>
-                        <button
-                            onClick={() => setShowAddModal(true)}
-                            className="mt-4 text-sm text-emerald-400 hover:underline flex items-center gap-1 mx-auto"
-                        >
-                            <Plus className="w-3 h-3" />
-                            أضف أول مطعم
-                        </button>
+                        <p className="text-sm">لا توجد نتائج مطابقة.</p>
+                    </div>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-5 py-4 border-t border-border/20">
+                        <span className="text-xs text-muted-foreground">
+                            صفحة {page} من {totalPages} ({total} مطعم)
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => goToPage(page - 1)}
+                                disabled={page <= 1}
+                                className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                            {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                                const pg = totalPages <= 5 ? i + 1 : Math.max(1, page - 2) + i;
+                                if (pg > totalPages) return null;
+                                return (
+                                    <button
+                                        key={pg}
+                                        onClick={() => goToPage(pg)}
+                                        className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${pg === page
+                                            ? "bg-primary text-primary-foreground"
+                                            : "hover:bg-secondary/50 text-muted-foreground"
+                                        }`}
+                                    >
+                                        {pg}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                onClick={() => goToPage(page + 1)}
+                                disabled={page >= totalPages}
+                                className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -539,7 +798,7 @@ export default function AdminRestaurantsPage() {
             <AddRestaurantModal
                 open={showAddModal}
                 onClose={() => setShowAddModal(false)}
-                onCreated={loadRestaurants}
+                onCreated={() => { setPage(1); loadRestaurants({ pg: 1 }); }}
             />
         </div>
     );

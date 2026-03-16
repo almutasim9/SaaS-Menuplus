@@ -9,6 +9,47 @@ export type Json =
 export interface Database {
     public: {
         Tables: {
+            restaurant_addons: {
+                Row: {
+                    id: string;
+                    restaurant_id: string;
+                    addon_key: 'discounts' | 'advanced_delivery' | 'analytics_pro' | 'custom_branding' | 'custom_domain';
+                    is_active: boolean;
+                    price_monthly: number;
+                    activated_at: string | null;
+                    expires_at: string | null;
+                    activated_by: string | null;
+                    notes: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    restaurant_id: string;
+                    addon_key: 'discounts' | 'advanced_delivery' | 'analytics_pro' | 'custom_branding' | 'custom_domain';
+                    is_active?: boolean;
+                    price_monthly: number;
+                    activated_at?: string | null;
+                    expires_at?: string | null;
+                    activated_by?: string | null;
+                    notes?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    restaurant_id?: string;
+                    addon_key?: 'discounts' | 'advanced_delivery' | 'analytics_pro' | 'custom_branding' | 'custom_domain';
+                    is_active?: boolean;
+                    price_monthly?: number;
+                    activated_at?: string | null;
+                    expires_at?: string | null;
+                    activated_by?: string | null;
+                    notes?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
             profiles: {
                 Row: {
                     id: string;
@@ -59,6 +100,8 @@ export interface Database {
                     max_products: number;
                     max_orders_per_month: number;
                     custom_domain: string | null;
+                    accept_out_of_zone_orders: boolean;
+                    out_of_zone_min_order: number;
                     created_at: string;
                 };
                 Insert: {
@@ -84,6 +127,8 @@ export interface Database {
                     max_products?: number;
                     max_orders_per_month?: number;
                     custom_domain?: string | null;
+                    accept_out_of_zone_orders?: boolean;
+                    out_of_zone_min_order?: number;
                     created_at?: string;
                 };
                 Update: {
@@ -108,6 +153,8 @@ export interface Database {
                     max_products?: number;
                     max_orders_per_month?: number;
                     custom_domain?: string | null;
+                    accept_out_of_zone_orders?: boolean;
+                    out_of_zone_min_order?: number;
                     created_at?: string;
                 };
             };
@@ -302,6 +349,8 @@ export interface Database {
                     flat_rate: number;
                     free_delivery_threshold: number | null;
                     is_active: boolean;
+                    estimated_delivery_time: string | null;
+                    min_order_amount: number | null;
                     created_at: string;
                 };
                 Insert: {
@@ -311,6 +360,8 @@ export interface Database {
                     flat_rate: number;
                     free_delivery_threshold?: number | null;
                     is_active?: boolean;
+                    estimated_delivery_time?: string | null;
+                    min_order_amount?: number | null;
                     created_at?: string;
                 };
                 Update: {
@@ -320,6 +371,8 @@ export interface Database {
                     flat_rate?: number;
                     free_delivery_threshold?: number | null;
                     is_active?: boolean;
+                    estimated_delivery_time?: string | null;
+                    min_order_amount?: number | null;
                     created_at?: string;
                 };
             };

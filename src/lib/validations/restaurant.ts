@@ -7,6 +7,8 @@ export const createRestaurantSchema = z.object({
     restaurantName: z.string().min(2, { message: "اسم المطعم مطلوب" }),
     slug: z.string().optional(),
     plan: z.enum(["free", "pro", "business"]).optional().default("free"),
+    governorate: z.string().optional(),
+    city: z.string().optional(),
 });
 
 export type CreateRestaurantInput = z.infer<typeof createRestaurantSchema>;

@@ -9,43 +9,50 @@ export type VisitStats = {
     dailyVisits: { date: string; qr: number; direct: number; total: number }[];
 };
 
-export async function getVisitStats(restaurantId: string): Promise<VisitStats> {
+export async function getVisitStats(restaurantId: string, days: number = 7): Promise<VisitStats> {
     const supabase = await createClient();
 
-    // Total counts by source
+    const startDate = days > 0 
+        ? new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+        : '1970-01-01T00:00:00Z';
+
+    // Total counts by source (Time Bound)
     const [totalRes, qrRes, directRes] = await Promise.all([
         supabase
             .from("visits")
             .select("id", { count: "exact", head: true })
-            .eq("restaurant_id", restaurantId),
+            .eq("restaurant_id", restaurantId)
+            .gte("created_at", startDate),
         supabase
             .from("visits")
             .select("id", { count: "exact", head: true })
             .eq("restaurant_id", restaurantId)
-            .eq("source", "qr"),
+            .eq("source", "qr")
+            .gte("created_at", startDate),
         supabase
             .from("visits")
             .select("id", { count: "exact", head: true })
             .eq("restaurant_id", restaurantId)
-            .eq("source", "direct"),
+            .eq("source", "direct")
+            .gte("created_at", startDate),
     ]);
 
-    // Last 7 days daily breakdown
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Daily breakdown for the selected period (max 30 days for the chart to avoid clutter)
+    const chartDays = days > 0 ? (days > 30 ? 30 : days) : 30;
+    const chartStartDate = new Date(Date.now() - chartDays * 24 * 60 * 60 * 1000);
 
     const { data: recentVisits } = await supabase
         .from("visits")
         .select("source, created_at")
         .eq("restaurant_id", restaurantId)
-        .gte("created_at", sevenDaysAgo.toISOString())
+        .gte("created_at", chartStartDate.toISOString())
         .order("created_at", { ascending: true });
 
     // Aggregate by day
     const dayMap: Record<string, { qr: number; direct: number }> = {};
 
-    // Initialize all 7 days
-    for (let i = 6; i >= 0; i--) {
+    // Initialize the chart periods
+    for (let i = chartDays - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const key = d.toISOString().split("T")[0];

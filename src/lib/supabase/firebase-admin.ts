@@ -14,7 +14,7 @@ if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-      console.log('Firebase Admin initialized successfully');
+      console.debug('Firebase Admin initialized successfully');
     } else {
       console.warn('FIREBASE_SERVICE_ACCOUNT_KEY is missing or empty');
     }
@@ -67,7 +67,7 @@ export async function sendPushNotification({
 
   try {
     const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`Successfully sent ${response.successCount} notifications; ${response.failureCount} failed.`);
+    console.debug(`Successfully sent ${response.successCount} notifications; ${response.failureCount} failed.`);
     
     // In a real app, you might want to remove invalid tokens from the database here
     if (response.failureCount > 0) {

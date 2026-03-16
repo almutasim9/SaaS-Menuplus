@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { arabicToEnglishNumbers } from "@/lib/utils";
 
 type Plan = "free" | "pro" | "business";
 
@@ -277,7 +278,7 @@ export default function SignUpPage() {
                                     <Label className="text-sm font-medium text-gray-300">رقم الهاتف (اختياري)</Label>
                                     <Input
                                         value={phone}
-                                        onChange={(e) => setPhone(e.target.value)}
+                                        onChange={(e) => setPhone(arabicToEnglishNumbers(e.target.value))}
                                         type="tel"
                                         placeholder="07XX XXX XXXX"
                                         className="h-12 rounded-xl bg-white/5 border-white/10 focus:border-emerald-500/50 text-white placeholder:text-gray-600"

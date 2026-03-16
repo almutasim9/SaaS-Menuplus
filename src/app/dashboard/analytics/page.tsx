@@ -7,6 +7,8 @@ import { getDashboardMetrics } from "@/lib/actions/analytics";
 import { getVisitStats, type VisitStats } from "@/lib/actions/visits";
 import { useTranslation } from "@/lib/i18n/context";
 import { createClient } from "@/lib/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
     BarChart,
     Bar,
@@ -18,20 +20,34 @@ import {
     Legend,
 } from "recharts";
 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+
 export default function AnalyticsPage() {
     const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
+    const [timeRange, setTimeRange] = useState("7");
+    const [customStart, setCustomStart] = useState("");
+    const [customEnd, setCustomEnd] = useState("");
+    const [chartMetric, setChartMetric] = useState<"revenue" | "orders">("revenue");
+    
     const [metrics, setMetrics] = useState<{
         totalOrders: number;
         totalRevenue: number;
         topProducts: { name: string; sales: number }[];
-        revenueData: { date: string; revenue: number }[];
+        dailyData: { date: string; revenue: number; orders: number }[];
         conversionRates: { name: string; views: number; sales: number; rate: number }[];
     } | null>(null);
     const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
 
     useEffect(() => {
         async function fetchAnalytics() {
+            setLoading(true);
             try {
                 const supabase = createClient();
                 const { data: { user } } = await supabase.auth.getUser();
@@ -44,9 +60,20 @@ export default function AnalyticsPage() {
                     .single();
 
                 if (restaurant) {
+                    let start: string | undefined;
+                    let end: string | undefined;
+
+                    if (timeRange === "custom") {
+                        if (customStart) start = new Date(customStart).toISOString();
+                        if (customEnd) end = new Date(customEnd).toISOString();
+                    } else if (timeRange !== "0") {
+                        const days = parseInt(timeRange);
+                        start = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+                    }
+
                     const [metricsData, visitsData] = await Promise.all([
-                        getDashboardMetrics(restaurant.id),
-                        getVisitStats(restaurant.id).catch(() => null),
+                        getDashboardMetrics(restaurant.id, start, end),
+                        getVisitStats(restaurant.id, parseInt(timeRange) || 7).catch(() => null),
                     ]);
                     setMetrics(metricsData);
                     setVisitStats(visitsData);
@@ -58,9 +85,17 @@ export default function AnalyticsPage() {
             }
         }
         fetchAnalytics();
-    }, []);
+    }, [timeRange, customStart, customEnd]);
 
-    if (loading) {
+    const getRangeLabel = () => {
+        if (timeRange === "1") return t("analytics.today");
+        if (timeRange === "7") return t("analytics.last7Days");
+        if (timeRange === "30") return t("analytics.last30Days");
+        if (timeRange === "custom") return t("analytics.customRange");
+        return t("analytics.allTime");
+    };
+
+    if (loading && !metrics) {
         return (
             <div className="flex items-center justify-center h-[60vh]">
                 <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -74,12 +109,53 @@ export default function AnalyticsPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold">{t("analytics.title")}</h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                    {t("analytics.subtitle")}
-                </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold">{t("analytics.title")}</h1>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        {t("analytics.subtitle")}
+                    </p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground hidden md:inline">{t("analytics.filterRange")}:</span>
+                    <Select value={timeRange} onValueChange={setTimeRange}>
+                        <SelectTrigger className="w-[180px] glass-card border-border/50">
+                            <SelectValue placeholder={t("analytics.selectRange")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="1">{t("analytics.today")}</SelectItem>
+                            <SelectItem value="7">{t("analytics.last7Days")}</SelectItem>
+                            <SelectItem value="30">{t("analytics.last30Days")}</SelectItem>
+                            <SelectItem value="0">{t("analytics.allTime")}</SelectItem>
+                            <SelectItem value="custom">{t("analytics.customRange")}</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
+
+            {timeRange === "custom" && (
+                <div className="flex flex-wrap items-center gap-3 p-4 bg-secondary/20 rounded-2xl border border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground px-1">{t("analytics.from")}</p>
+                        <Input 
+                            type="date" 
+                            value={customStart} 
+                            onChange={(e) => setCustomStart(e.target.value)}
+                            className="w-[160px] h-9 glass-card border-border/50"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground px-1">{t("analytics.to")}</p>
+                        <Input 
+                            type="date" 
+                            value={customEnd} 
+                            onChange={(e) => setCustomEnd(e.target.value)}
+                            className="w-[160px] h-9 glass-card border-border/50"
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* ============================== */}
             {/* VISIT STATS SECTION */}
@@ -97,7 +173,7 @@ export default function AnalyticsPage() {
                                 <div className="text-3xl font-bold bg-gradient-to-br from-blue-600 to-blue-400 bg-clip-text text-transparent">
                                     {visitStats.totalVisits.toLocaleString()}
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">{t("analytics.allTime")}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{getRangeLabel()}</p>
                             </CardContent>
                         </Card>
 
@@ -143,7 +219,7 @@ export default function AnalyticsPage() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Eye className="w-5 h-5 text-blue-500" />
-                                {t("analytics.visitsLast7")}
+                                {t("analytics.visitsTrend")} ({getRangeLabel()})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pl-2">
@@ -193,7 +269,7 @@ export default function AnalyticsPage() {
                         <div className="text-3xl font-bold bg-gradient-to-br from-emerald-600 to-emerald-400 bg-clip-text text-transparent">
                             {metrics.totalRevenue.toLocaleString()} <span className="text-sm">د.ع</span>
                         </div>
-                        <p className="text-xs text-emerald-600/80 mt-1 font-medium">{t("analytics.allTime")}</p>
+                        <p className="text-xs text-emerald-600/80 mt-1 font-medium">{getRangeLabel()}</p>
                     </CardContent>
                 </Card>
                 <Card className="glass-card border-border/50 shadow-sm relative overflow-hidden group">
@@ -226,33 +302,63 @@ export default function AnalyticsPage() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
                 <Card className="col-span-4 glass-card border-border/50 shadow-sm">
-                    <CardHeader>
-                        <CardTitle>{t("analytics.revenueLast7")}</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-lg font-semibold">{chartMetric === 'revenue' ? t("analytics.revenueTrend") : t("analytics.ordersTrend")} ({getRangeLabel()})</CardTitle>
+                        <div className="flex bg-secondary/50 p-1 rounded-xl border border-border/50">
+                            <button 
+                                onClick={() => setChartMetric('revenue')} 
+                                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${chartMetric === 'revenue' ? 'bg-primary text-white shadow-md scale-[1.02]' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                {t("analytics.revenue")}
+                            </button>
+                            <button 
+                                onClick={() => setChartMetric('orders')} 
+                                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${chartMetric === 'orders' ? 'bg-primary text-white shadow-md scale-[1.02]' : 'text-muted-foreground hover:text-foreground'}`}
+                            >
+                                {t("analytics.orders")}
+                            </button>
+                        </div>
                     </CardHeader>
                     <CardContent className="pl-2">
                         <div className="h-[300px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={metrics.revenueData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                                    <XAxis
-                                        dataKey="date"
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
+                                <BarChart data={metrics.dailyData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis 
+                                        dataKey="date" 
+                                        stroke="#888888" 
+                                        fontSize={12} 
+                                        tickLine={false} 
+                                        axisLine={false} 
                                     />
-                                    <YAxis
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickFormatter={(value) => `${value}`}
+                                    <YAxis 
+                                        stroke="#888888" 
+                                        fontSize={12} 
+                                        tickLine={false} 
+                                        axisLine={false} 
+                                        tickFormatter={(value) => chartMetric === 'revenue' ? `${value.toLocaleString()}` : `${value}`} 
                                     />
-                                    <Tooltip
-                                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                    <Tooltip 
+                                        cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 4 }}
+                                        contentStyle={{ 
+                                            backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                                            backdropFilter: 'blur(8px)',
+                                            borderRadius: '12px', 
+                                            border: '1px solid rgba(0,0,0,0.1)', 
+                                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                                            color: '#000'
+                                        }}
+                                        formatter={(value: any) => [
+                                            chartMetric === 'revenue' ? `${value.toLocaleString()} د.ع` : value, 
+                                            chartMetric === 'revenue' ? (t("analytics.revenue") || "المبيعات") : (t("analytics.orders") || "الطلبات")
+                                        ]}
                                     />
-                                    <Bar dataKey="revenue" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-emerald-500" />
+                                    <Bar 
+                                        dataKey={chartMetric} 
+                                        radius={[6, 6, 0, 0]} 
+                                        className={chartMetric === 'revenue' ? "fill-emerald-500" : "fill-primary"}
+                                        animationDuration={1500}
+                                    />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

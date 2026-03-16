@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import NextImage from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -27,11 +28,15 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
     // Sort variants and addons just in case
     const variants = [...(product.product_variants || [])].sort((a, b) => a.sort_order - b.sort_order);
     const addons = [...(product.product_addons || [])].sort((a, b) => a.sort_order - b.sort_order);
+    
+    const minPrice = variants.length > 0 
+        ? Math.min(...variants.map(v => Number(v.price))) 
+        : Number(product.price);
 
     const hasVariants = variants.length > 0;
     const hasAddons = addons.length > 0;
 
-    const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(hasVariants ? variants[0] : null);
+    const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
     const [selectedAddons, setSelectedAddons] = useState<ProductAddon[]>([]);
 
     // Calculate total price based on selection
@@ -49,6 +54,7 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
 
     const handleAddToCart = () => {
         if (!slug) return;
+        if (hasVariants && !selectedVariant) return;
 
         const vName = selectedVariant ? (locale === 'en' && selectedVariant.name_en ? selectedVariant.name_en : locale === 'ku' && selectedVariant.name_ku ? selectedVariant.name_ku : selectedVariant.name) : undefined;
 
@@ -65,7 +71,7 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
         });
         onClose();
         // Reset state for next open if needed
-        setSelectedVariant(hasVariants ? variants[0] : null);
+        setSelectedVariant(null);
         setSelectedAddons([]);
     };
 
@@ -101,7 +107,7 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
                     {/* Header */}
                     <div className="relative aspect-video bg-secondary/30 flex-shrink-0">
                         {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                            <NextImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" fill unoptimized />
                         ) : (
                             <div className="w-full h-full bg-secondary/50" />
                         )}
@@ -191,20 +197,26 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
                         )}
                     </div>
 
-                    {/* Footer / Add to Order Button */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur border-t border-border/50">
                         <button
                             onClick={handleAddToCart}
-                            className={`w-full h-12 sm:h-14 gradient-emerald text-white font-semibold rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-between px-6 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}
+                            disabled={hasVariants && !selectedVariant}
+                            className={`w-full h-12 sm:h-14 gradient-emerald text-white font-semibold rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-between px-6 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'} ${hasVariants && !selectedVariant ? 'opacity-60 cursor-not-allowed grayscale' : ''}`}
                         >
-                            <span>{t("storefront.addToOrder")}</span>
+                            <span>{hasVariants && !selectedVariant ? t("storefront.selectOptionMessage") : t("storefront.addToOrder")}</span>
                             <div className={`flex items-center gap-2 ${dir === 'rtl' ? 'text-left flex-row-reverse' : 'text-right'}`}>
-                                {product.compare_at_price && product.compare_at_price > product.price && !hasVariants && selectedAddons.length === 0 && (
-                                    <span className="text-xs line-through opacity-70">
-                                        {product.compare_at_price.toFixed(0)} {t("storefront.currency")}
-                                    </span>
+                                {!selectedVariant && hasVariants ? (
+                                    <span className="font-bold">{minPrice.toFixed(0)} {t("storefront.currency")}</span>
+                                ) : (
+                                    <>
+                                        {product.compare_at_price && product.compare_at_price > product.price && !hasVariants && selectedAddons.length === 0 && (
+                                            <span className="text-xs line-through opacity-70">
+                                                {product.compare_at_price.toFixed(0)} {t("storefront.currency")}
+                                            </span>
+                                        )}
+                                        <span className="font-bold">{total.toFixed(0)} {t("storefront.currency")}</span>
+                                    </>
                                 )}
-                                <span className="font-bold">{total.toFixed(0)} {t("storefront.currency")}</span>
                             </div>
                         </button>
                     </div>

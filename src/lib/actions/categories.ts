@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireRestaurantOwnership, requireAuth } from "@/lib/actions/_auth-guard";
 
 export async function getCategories(restaurantId: string) {
     const supabase = await createClient();
@@ -20,6 +21,7 @@ export async function getCategories(restaurantId: string) {
 }
 
 export async function createCategory(restaurantId: string, name: string, name_en?: string | null, name_ku?: string | null, sortOrder: number = 0) {
+    await requireRestaurantOwnership(restaurantId);
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("categories")
@@ -41,6 +43,9 @@ export async function createCategory(restaurantId: string, name: string, name_en
 
 export async function updateCategory(id: string, name: string, name_en?: string | null, name_ku?: string | null, sortOrder?: number) {
     const supabase = await createClient();
+    const { data: cat } = await supabase.from("categories").select("restaurant_id").eq("id", id).single();
+    if (!cat) throw new Error("Category not found");
+    await requireRestaurantOwnership(cat.restaurant_id);
     const updateData: Record<string, unknown> = { name, name_en, name_ku };
     if (sortOrder !== undefined) updateData.sort_order = sortOrder;
 
@@ -65,9 +70,12 @@ export async function updateCategory(id: string, name: string, name_en?: string 
 
 export async function deleteCategory(id: string) {
     const supabase = await createClient();
+    const { data: cat } = await supabase.from("categories").select("restaurant_id").eq("id", id).single();
+    if (!cat) throw new Error("Category not found");
+    await requireRestaurantOwnership(cat.restaurant_id);
     const { error } = await supabase
         .from("categories")
-        .update({ deleted_at: new Date().toISOString() } as any)
+        .update({ deleted_at: new Date().toISOString() } as { deleted_at: string })
         .eq("id", id);
 
     if (error) {
@@ -102,6 +110,9 @@ export async function updateCategoryOrder(items: { id: string; sort_order: numbe
 
 export async function toggleCategoryVisibility(id: string, isHidden: boolean) {
     const supabase = await createClient();
+    const { data: cat } = await supabase.from("categories").select("restaurant_id").eq("id", id).single();
+    if (!cat) throw new Error("Category not found");
+    await requireRestaurantOwnership(cat.restaurant_id);
     const { error } = await supabase
         .from("categories")
         .update({ is_hidden: isHidden })

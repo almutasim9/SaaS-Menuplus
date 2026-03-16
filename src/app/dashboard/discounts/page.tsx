@@ -34,6 +34,7 @@ import { Plus, Trash2, Tags, Percent, DollarSign, Dices, CalendarOff, Infinity }
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Coupon } from "@/lib/types/database.types";
+import { arabicToEnglishNumbers } from "@/lib/utils";
 
 export default function DiscountsPage() {
     const { t } = useTranslation();
@@ -239,14 +240,12 @@ export default function DiscountsPage() {
                                     <div className="relative">
                                         <Input
                                             name="discount_value"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
+                                            type="text"
                                             required={discountType !== "free_delivery"}
                                             disabled={discountType === "free_delivery"}
                                             className="rounded-xl bg-secondary/50 disabled:opacity-50 pr-8 pl-3"
                                             value={discountType === "free_delivery" ? "0" : discountValue}
-                                            onChange={(e) => setDiscountValue(e.target.value)}
+                                            onChange={(e) => setDiscountValue(arabicToEnglishNumbers(e.target.value))}
                                         />
                                         {discountType !== "free_delivery" && (
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
@@ -292,8 +291,8 @@ export default function DiscountsPage() {
                                     </div>
                                     <Input
                                         name="min_order"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
+                                        onChange={(e) => e.target.value = arabicToEnglishNumbers(e.target.value)}
                                         placeholder="Min Amount"
                                         className="rounded-xl bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed"
                                         disabled={!hasMinOrder}
@@ -307,7 +306,8 @@ export default function DiscountsPage() {
                                     </div>
                                     <Input
                                         name="max_uses"
-                                        type="number"
+                                        type="text"
+                                        onChange={(e) => e.target.value = arabicToEnglishNumbers(e.target.value)}
                                         placeholder="Max Uses"
                                         className="rounded-xl bg-secondary/50 disabled:opacity-30 disabled:cursor-not-allowed"
                                         disabled={!hasMaxUses}

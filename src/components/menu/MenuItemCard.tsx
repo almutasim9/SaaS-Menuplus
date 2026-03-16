@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NextImage from "next/image";
 import { motion } from "framer-motion";
 import { Plus, ImageIcon, Truck } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -8,6 +9,7 @@ import { useCartStore } from "@/lib/store/cartStore";
 import { ProductCustomizationModal } from "./ProductCustomizationModal";
 import type { ProductWithCustomization } from "@/lib/types/database.types";
 import { Badge } from "@/components/ui/badge";
+import { incrementProductView } from "@/lib/actions/products";
 import { useTranslation } from "@/lib/i18n/context";
 import { isProductCurrentlyAvailable } from "@/lib/utils/availability";
 import { Clock } from "lucide-react";
@@ -49,6 +51,8 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                     price: Number(product.price),
                     image_url: product.image_url || undefined,
                 });
+                // Fix: Also increment view for quick adds to keep stats consistent
+                incrementProductView(product.id);
             }
         }
     };
@@ -64,7 +68,14 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
 
     const { isAvailable: isScheduledAvailable, nextOpening } = isProductCurrentlyAvailable(product.product_availability as any);
     const isCurrentlyUnavailable = isOutOfStock || !isScheduledAvailable;
-
+    
+    // Price calculation
+    const variants = product.product_variants || [];
+    const hasVariants = variants.length > 0;
+    const minPrice = hasVariants 
+        ? Math.min(...variants.map(v => Number(v.price))) 
+        : Number(product.price);
+    const hasPriceRange = hasVariants && new Set(variants.map(v => Number(v.price))).size > 1;
 
     return (
         <motion.div
@@ -72,16 +83,17 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.05 }}
             className={`flex ${isListLayout ? "flex-row h-28 items-center p-3 gap-3" : "flex-col p-2.5 h-auto"} rounded-[2rem] ${isDark ? "bg-[#141414] border-gray-800" : "bg-white border-gray-50"} border shadow-[0_4px_24px_-8px_rgba(0,0,0,0.05)] ${isCurrentlyUnavailable ? "opacity-60 grayscale cursor-not-allowed" : "hover:shadow-lg transition-transform hover:-translate-y-1 duration-300 cursor-pointer"} relative group overflow-hidden`}
-            onClick={() => { if (hasOptions && !isCurrentlyUnavailable) setIsModalOpen(true) }}
-
+            onClick={() => { if (!isCurrentlyUnavailable) setIsModalOpen(true) }}
         >
             {/* Image Section - Takes top space in Grid */}
             <div className={`relative ${isListLayout ? "w-20 h-20 shrink-0" : "aspect-square w-full"} rounded-3xl overflow-hidden ${isDark ? "bg-[#2a2a2a]" : "bg-gray-100/70"} flex items-center justify-center`} style={hasImage || isDark ? undefined : { backgroundColor: 'var(--primary)05' }}>
                 {hasImage ? (
-                    <img
+                    <NextImage
                         src={product.image_url!}
                         alt={localizedName}
                         className="w-[85%] h-[85%] object-contain scale-95 group-hover:scale-105 transition-transform duration-300"
+                        fill
+                        unoptimized
                     />
                 ) : (
                     <div className="w-[85%] h-[85%] rounded-3xl bg-white/50 flex items-center justify-center">
@@ -106,9 +118,16 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                                 {Number(product.compare_at_price).toFixed(0)} {t("storefront.currency")}
                             </span>
                         )}
-                        <p className="text-base font-bold whitespace-nowrap" style={{ color: isDiscounted ? '#ef4444' : 'var(--primary)' }}>
-                            {Number(product.price).toFixed(0)} <span className="text-[11px] font-medium opacity-80">{t("storefront.currency")}</span>
-                        </p>
+                        <div className="flex flex-col">
+                            {hasPriceRange && (
+                                <span className="text-[10px] text-muted-foreground font-medium opacity-70">
+                                    {t("storefront.startsFrom")}
+                                </span>
+                            )}
+                            <p className="text-base font-bold whitespace-nowrap" style={{ color: isDiscounted ? '#ef4444' : 'var(--primary)' }}>
+                                {minPrice.toFixed(0)} <span className="text-[11px] font-medium opacity-80">{t("storefront.currency")}</span>
+                            </p>
+                        </div>
                         {isFreeDelivery && (
                             <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 font-semibold mt-0.5">
                                 <Truck className="w-2.5 h-2.5" />

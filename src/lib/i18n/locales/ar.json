@@ -39,7 +39,8 @@
         "wed": "الأربعاء",
         "thu": "الخميس",
         "fri": "الجمعة",
-        "sat": "السبت"
+        "sat": "السبت",
+        "category": "التصنيف"
     },
     "sidebar": {
         "dashboard": "لوحة التحكم",
@@ -52,7 +53,9 @@
         "delivery": "التوصيل",
         "discounts": "الخصومات",
         "billing": "الفواتير",
+        "support": "الدعم الفني",
         "settings": "الإعدادات",
+        "locations": "الأحياء والمناطق",
         "logout": "تسجيل الخروج"
     },
     "dashboard": {
@@ -96,7 +99,20 @@
         "ofTotal": "من الإجمالي",
         "visitsLast7": "الزيارات (آخر 7 أيام)",
         "qrCode": "QR Code",
-        "directLink": "رابط مباشر"
+        "directLink": "رابط مباشر",
+        "last7Days": "آخر 7 أيام",
+        "last30Days": "آخر 30 يوم",
+        "customRange": "فترة مخصصة",
+        "filterRange": "فترة العرض",
+        "selectRange": "اختر الفترة",
+        "from": "من تاريخ",
+        "to": "إلى تاريخ",
+        "today": "اليوم",
+        "visitsTrend": "حركة الزيارات",
+        "revenueTrend": "تطور المبيعات",
+        "ordersTrend": "حركة الطلبات",
+        "revenue": "المبيعات",
+        "orders": "الطلبات"
     },
     "notifications": {
         "title": "الإشعارات",
@@ -138,7 +154,7 @@
         "productName": "اسم المنتج",
         "noCategories": "لا توجد تصنيفات",
         "noProducts": "لا توجد منتجات",
-        "available": "متاح",
+        "available": "متاح للطلب",
         "unavailable": "غير متاح",
         "hidden": "مخفي",
         "allItems": "جميع الأصناف",
@@ -175,7 +191,14 @@
         "hiddenItems": "الأصناف المخفية",
         "discountedItems": "أصناف مخفضة",
         "menuEmpty": "قائمة الطعام فارغة",
-        "createCategoryToStart": "قم بإنشاء أول تصنيف للبدء في إضافة المنتجات"
+        "createCategoryToStart": "قم بإنشاء أول تصنيف للبدء في إضافة المنتجات",
+        "showTranslations": "إضافة لغات أخرى (إنكليزي / كردي)",
+        "translations": "اللغات والترجمة",
+        "mustSelectOne": "يجب اختيار واحد (إلزامي)",
+        "optionalAddons": "إضافات اختيارية",
+        "prepTime": "وقت التحضير (دقائق)",
+        "advancedSettings": "إعدادات متقدمة",
+        "advancedSettingsDesc": "تحكم في توفر المنتج، المخزون، وتفاصيل إضافية."
     },
     "orders": {
         "activeOrders": "الطلبات النشطة",
@@ -261,6 +284,8 @@
         "subscriptionExpired": "نعتذر، المنيو غير متاح حالياً بسبب انتهاء فترة الاشتراك.",
         "viewCart": "عرض السلة",
         "currency": "د.ع",
+        "startsFrom": "يبدأ من",
+        "selectOptionMessage": "يرجى اختيار أحد الخيارات للمتابعة",
         "checkout": {
             "orderPlaced": "تم تأكيد الطلب!",
             "orderReceived": "تم استلام طلبك. سنبدأ في تحضيره قريباً.",
@@ -307,6 +332,7 @@
                 "placeholder": "أدخل رمز الكوبون",
                 "apply": "تفعيل",
                 "success": "تم تفعيل الكوبون! وفرت {{discount}}",
+                "freeDeliveryApplied": "تم تفعيل كوبون التوصيل المجاني!",
                 "invalid": "كوبون غير صالح"
             },
             "summary": {

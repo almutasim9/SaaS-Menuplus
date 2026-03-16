@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireRestaurantOwnership } from "@/lib/actions/_auth-guard";
+import { validateImageFile } from "@/lib/utils/file-validation";
 
 export async function getRestaurantAppearance(restaurantId: string) {
     const supabase = await createClient();
@@ -16,6 +18,19 @@ export async function getRestaurantAppearance(restaurantId: string) {
 }
 
 export async function updateAppearance(restaurantId: string, formData: FormData) {
+    await requireRestaurantOwnership(restaurantId);
+
+    // Validate all uploaded files before processing
+    const filesToValidate = [
+        { file: formData.get("logo") as File | null, name: "اللوجو" },
+        { file: formData.get("banner") as File | null, name: "البانر" },
+        { file: formData.get("favicon") as File | null, name: "الأيقونة" },
+        { file: formData.get("default_product_image_file") as File | null, name: "الصورة الافتراضية" },
+    ];
+    for (const { file, name } of filesToValidate) {
+        if (file && file.size > 0) validateImageFile(file, name);
+    }
+
     const supabase = await createClient();
 
     const primaryColor = formData.get("primary_color") as string;

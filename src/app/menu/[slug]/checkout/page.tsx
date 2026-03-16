@@ -5,13 +5,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore, useCartItems, useCartTotals } from "@/lib/store/cartStore";
 import { createOrder } from "@/lib/actions/orders";
 import { validateCoupon } from "@/lib/actions/discounts";
-import { getDeliveryZones } from "@/lib/actions/delivery";
-import { ArrowLeft, Minus, Plus, Trash2, Tag, Check, ShoppingBag, Store, Truck, Car, MapPin } from "lucide-react";
+import { getDeliveryZones, getCityAreas } from "@/lib/actions/delivery";
+import { ArrowLeft, ShoppingBag, Store, Truck, Car, Check } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/lib/i18n/context";
+import { arabicToEnglishNumbers } from "@/lib/utils";
+import { useDeliveryValidation } from "@/lib/hooks/useDeliveryValidation";
+import { CartItemsList } from "@/components/storefront/checkout/CartItemsList";
+import { CouponSection } from "@/components/storefront/checkout/CouponSection";
+import { OrderSummary } from "@/components/storefront/checkout/OrderSummary";
+import { DeliveryForm } from "@/components/storefront/checkout/DeliveryForm";
+import { DineInForm } from "@/components/storefront/checkout/DineInForm";
+import { TakeawayForm } from "@/components/storefront/checkout/TakeawayForm";
 
 export default function CheckoutPage() {
     const { t, dir } = useTranslation();
@@ -58,9 +66,14 @@ export default function CheckoutPage() {
         is_delivery_enabled: boolean;
         is_whatsapp_ordering_enabled: boolean;
         whatsapp_number: string | null;
+        accept_out_of_zone_orders: boolean;
+        out_of_zone_min_order: number;
+        city: string | null;
     } | null>(null);
     const [isFreeDelivery, setIsFreeDelivery] = useState(false);
+    const [cityAreas, setCityAreas] = useState<string[]>([]);
     const [showCouponInput, setShowCouponInput] = useState(false);
+    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
     // Persistence Effect - Load
     useEffect(() => {
@@ -97,8 +110,20 @@ export default function CheckoutPage() {
                     is_delivery_enabled: data.is_delivery_enabled ?? true,
                     is_whatsapp_ordering_enabled: data.is_whatsapp_ordering_enabled ?? false,
                     whatsapp_number: data.whatsapp_number ?? null,
+                    accept_out_of_zone_orders: data.accept_out_of_zone_orders ?? false,
+                    out_of_zone_min_order: data.out_of_zone_min_order ?? 0,
+                    city: data.city ?? null,
                 });
                 setIsFreeDelivery(data.is_free_delivery ?? false);
+
+                if (data.accept_out_of_zone_orders && data.city) {
+                    try {
+                        const areas = await getCityAreas(data.city);
+                        setCityAreas(areas || []);
+                    } catch (e) {
+                        console.error("Failed to fetch city areas");
+                    }
+                }
 
                 // Auto-select valid initial order type if default is disabled
                 if (!(data.is_dine_in_enabled ?? true)) {
@@ -117,41 +142,43 @@ export default function CheckoutPage() {
         fetchRestaurant();
     }, [slug]);
 
-    const [deliveryFee, setDeliveryFee] = useState(0);
-    useEffect(() => {
-        if (orderType === "delivery" && areaName) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const zone = zones.find(z => z.delivery_areas?.some((a: any) => a.area_name === areaName));
-            if (zone) {
-                if (zone.free_delivery_threshold && total >= zone.free_delivery_threshold) {
-                    setDeliveryFee(0);
-                } else {
-                    setDeliveryFee(Number(zone.flat_rate) || 0);
-                }
-            } else {
-                setDeliveryFee(0);
-            }
-        } else {
-            setDeliveryFee(0);
-        }
-    }, [areaName, orderType, zones, total, isFreeDelivery]);
-    // Override: if restaurant has global free delivery, always zero it
-    const effectiveDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
-
     const subtotal = total;
+    const {
+        selectedZone,
+        effectiveDeliveryFee,
+        isMinOrderReached,
+        isOutOfZone,
+        isFreeDeliveryCoupon
+    } = useDeliveryValidation({
+        orderType,
+        areaName,
+        zones,
+        subtotal,
+        orderSettings,
+        isRestaurantFreeDelivery: isFreeDelivery,
+        appliedCoupon,
+    });
+
     const grandTotal = subtotal - discount + effectiveDeliveryFee;
 
     const handleApplyCoupon = async () => {
         if (!restaurantId || !couponCode.trim()) return;
 
         const result = await validateCoupon(restaurantId, couponCode, subtotal);
-        if (result.valid && result.discount) {
-            setDiscount(result.discount);
+        if (result.valid && result.coupon) {
+            setDiscount(result.discount || 0);
+            setAppliedCoupon(result.coupon);
             setValidatedCoupon(true);
-            toast.success(t("storefront.checkout.coupon.success", { discount: result.discount.toFixed(0) + " " + t("storefront.currency") }));
+            
+            const successMsg = result.coupon.discount_type === "free_delivery" 
+                ? t("storefront.checkout.coupon.freeDeliveryApplied") || "Free delivery applied!"
+                : t("storefront.checkout.coupon.success", { discount: result.discount?.toFixed(0) + " " + t("storefront.currency") });
+                
+            toast.success(successMsg);
         } else {
             toast.error(result.message || t("storefront.checkout.coupon.invalid"));
             setDiscount(0);
+            setAppliedCoupon(null);
             setValidatedCoupon(false);
         }
     };
@@ -200,7 +227,7 @@ export default function CheckoutPage() {
                 table_number: orderType === "dine_in" ? tableNumber : null,
                 number_of_people: orderType === "dine_in" && numPeople ? parseInt(numPeople) : null,
                 area_name: orderType === "delivery" ? areaName : null,
-                nearest_landmark: orderType === "delivery" ? landmark : null,
+                nearest_landmark: orderType === "delivery" ? (isOutOfZone ? `(خارج الزون) ${landmark}` : landmark) : null,
                 car_details: orderType === "takeaway" ? carDetails : null,
                 status: "pending",
             });
@@ -265,7 +292,11 @@ export default function CheckoutPage() {
                 message += `*Table Number:* ${tableNumber}\n`;
                 if (numPeople) message += `*Number of People:* ${numPeople}\n`;
             } else if (orderType === 'delivery') {
-                message += `*Delivery Area:* ${areaName}\n`;
+                if (isOutOfZone) {
+                    message += `*Delivery Area:* ${areaName} (خارج نطاق التوصيل)\n`;
+                } else {
+                    message += `*Delivery Area:* ${areaName}\n`;
+                }
                 if (landmark) message += `*Landmark:* ${landmark}\n`;
                 if (address) message += `*Address:* ${address}\n`;
             } else if (orderType === 'takeaway') {
@@ -283,7 +314,13 @@ export default function CheckoutPage() {
             message += `------------------------\n`;
             message += `*Subtotal:* ${subtotal.toFixed(0)} د.ع\n`;
             if (discount > 0) message += `*Discount:* -${discount.toFixed(0)} د.ع\n`;
-            if (orderType === 'delivery') message += `*Delivery Fee:* ${effectiveDeliveryFee.toFixed(0)} د.ع\n`;
+            if (orderType === 'delivery') {
+                if (isOutOfZone) {
+                    message += `*Delivery Fee:* سيتم الاتصال بك لتحديد السعر\n`;
+                } else {
+                    message += `*Delivery Fee:* ${effectiveDeliveryFee.toFixed(0)} د.ع\n`;
+                }
+            }
             message += `*TOTAL:* ${grandTotal.toFixed(0)} د.ع\n`;
 
             // Redirect to WhatsApp
@@ -355,13 +392,15 @@ export default function CheckoutPage() {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allAreas = zones.filter(z => z.is_active).flatMap(z => z.delivery_areas || []);
-    const seen = new Set<string>();
-    const activeAreas = allAreas.filter(a => {
-        if (seen.has(a.area_name)) return false;
-        seen.add(a.area_name);
-        return true;
-    });
+    const allZoneAreas = zones.filter(z => z.is_active).flatMap(z => z.delivery_areas || []);
+    const zoneAreaNames = new Set(allZoneAreas.map(a => a.area_name));
+    
+    // If out-of-zone is enabled, show all city areas, otherwise just zone areas
+    const displayAreaNames = orderSettings?.accept_out_of_zone_orders && cityAreas.length > 0
+        ? Array.from(new Set([...zoneAreaNames, ...cityAreas]))
+        : Array.from(zoneAreaNames);
+
+    const sortedAreas = displayAreaNames.sort((a, b) => a.localeCompare(b, "ar"));
 
     return (
         <div className="max-w-lg mx-auto pb-8" dir={dir}>
@@ -438,287 +477,96 @@ export default function CheckoutPage() {
                             {/* DINE IN FIELDS */}
                             {orderType === "dine_in" && (
                                 <motion.div
-                                    key="dine_in_fields"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    className="grid grid-cols-2 gap-4"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="pt-2"
                                 >
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.tableNumber")}</Label>
-                                        <input
-                                            value={tableNumber}
-                                            onChange={(e) => setTableNumber(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.tableNumberPlaceholder")}
-                                            required
-                                            className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.numPeople")}</Label>
-                                        <input
-                                            value={numPeople}
-                                            type="number"
-                                            min="1"
-                                            onChange={(e) => setNumPeople(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.numPeoplePlaceholder")}
-                                            className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                        />
-                                    </div>
-                                    <div className="col-span-2 space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.nameOptional")}</Label>
-                                        <input
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.namePlaceholder")}
-                                            className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                        />
-                                    </div>
+                                    <DineInForm 
+                                        tableNumber={tableNumber} 
+                                        setTableNumber={setTableNumber}
+                                        numPeople={numPeople}
+                                        setNumPeople={setNumPeople}
+                                    />
                                 </motion.div>
                             )}
 
-                            {/* TAKEAWAY FIELDS */}
                             {orderType === "takeaway" && (
                                 <motion.div
-                                    key="takeaway_fields"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    className="space-y-4"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="pt-2"
                                 >
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.name")}</Label>
-                                            <input
-                                                value={name}
-                                                onChange={(e) => setName(e.target.value)}
-                                                placeholder={t("storefront.checkout.fields.namePlaceholder")}
-                                                required
-                                                className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.phone")}</Label>
-                                            <input
-                                                value={phone}
-                                                onChange={(e) => setPhone(e.target.value)}
-                                                placeholder={t("storefront.checkout.fields.phonePlaceholder")}
-                                                type="tel"
-                                                required
-                                                className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                                dir="ltr"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.carDetails")}</Label>
-                                        <input
-                                            value={carDetails}
-                                            onChange={(e) => setCarDetails(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.carDetailsPlaceholder")}
-                                            required
-                                            className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                        />
-                                    </div>
+                                    <TakeawayForm 
+                                        name={name}
+                                        setName={setName}
+                                        phone={phone}
+                                        setPhone={setPhone}
+                                        carDetails={carDetails}
+                                        setCarDetails={setCarDetails}
+                                    />
                                 </motion.div>
                             )}
 
-                            {/* DELIVERY FIELDS */}
                             {orderType === "delivery" && (
                                 <motion.div
-                                    key="delivery_fields"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    className="space-y-4"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="pt-2"
                                 >
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.name")}</Label>
-                                            <input
-                                                value={name}
-                                                onChange={(e) => setName(e.target.value)}
-                                                placeholder={t("storefront.checkout.fields.namePlaceholder")}
-                                                required
-                                                className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.phone")}</Label>
-                                            <input
-                                                value={phone}
-                                                onChange={(e) => setPhone(e.target.value)}
-                                                placeholder={t("storefront.checkout.fields.phonePlaceholder")}
-                                                type="tel"
-                                                required
-                                                className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                                dir="ltr"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.area")}</Label>
-                                        <div className="relative">
-                                            <MapPin className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
-                                            <select
-                                                required
-                                                value={areaName}
-                                                onChange={(e) => setAreaName(e.target.value)}
-                                                className={`w-full h-11 ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors appearance-none`}
-                                            >
-                                                <option value="" disabled>{t("storefront.checkout.fields.areaPlaceholder")}</option>
-                                                {activeAreas.map((area: any) => (
-                                                    <option key={area.id} value={area.area_name}>{area.area_name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.landmark")}</Label>
-                                        <input
-                                            value={landmark}
-                                            onChange={(e) => setLandmark(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.landmarkPlaceholder")}
-                                            className="w-full h-11 px-4 rounded-xl bg-background border border-border focus:outline-none focus:border-primary/50 transition-colors"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-muted-foreground text-xs">{t("storefront.checkout.fields.address")}</Label>
-                                        <textarea
-                                            value={address}
-                                            onChange={(e) => setAddress(e.target.value)}
-                                            placeholder={t("storefront.checkout.fields.addressPlaceholder")}
-                                            rows={2}
-                                            className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
-                                        />
-                                    </div>
+                                    <DeliveryForm 
+                                        name={name}
+                                        setName={setName}
+                                        phone={phone}
+                                        setPhone={setPhone}
+                                        areaName={areaName}
+                                        setAreaName={setAreaName}
+                                        landmark={landmark}
+                                        setLandmark={setLandmark}
+                                        address={address}
+                                        setAddress={setAddress}
+                                        sortedAreas={sortedAreas}
+                                        isOutOfZone={!!isOutOfZone}
+                                        isMinOrderReached={!!isMinOrderReached}
+                                        minOrderAmount={Number(selectedZone?.min_order_amount ?? orderSettings?.out_of_zone_min_order ?? 0)}
+                                        governorate={(orderSettings as any)?.governorate}
+                                    />
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
 
                     {/* Cart Items */}
-                    <div className="glass-card p-5 rounded-2xl space-y-4 border border-border/40">
-                        <Label className="text-base font-semibold block">{t("storefront.checkout.sectionTitles.orderItems")}</Label>
-                        <div className="space-y-3">
-                            {items.map((item, index) => (
-                                <div
-                                    key={item.cart_item_id || item.id}
-                                    className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30"
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-medium text-sm truncate">{item.name}</h3>
-                                        {item.variant && (
-                                            <p className="text-xs text-muted-foreground mt-0.5">{item.variant.name}</p>
-                                        )}
-                                        {item.addons && item.addons.length > 0 && (
-                                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                                + {item.addons.map(a => a.name).join(", ")}
-                                            </p>
-                                        )}
-                                        <p className="text-sm text-primary font-semibold mt-0.5" dir="ltr">
-                                            {(item.price * item.quantity).toFixed(0)} {t("storefront.currency")}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 bg-background border border-border/50 rounded-lg p-1">
-                                        <button type="button" onClick={() => updateQuantity(item.cart_item_id || item.id, item.quantity - 1)} className="w-7 h-7 rounded hover:bg-secondary flex items-center justify-center transition-colors">
-                                            <Minus className="w-3.5 h-3.5" />
-                                        </button>
-                                        <span className="text-sm font-medium w-5 text-center">{item.quantity}</span>
-                                        <button type="button" onClick={() => updateQuantity(item.cart_item_id || item.id, item.quantity + 1)} className="w-7 h-7 rounded hover:bg-secondary flex items-center justify-center transition-colors">
-                                            <Plus className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeItem(item.cart_item_id || item.id)}
-                                        className="w-9 h-9 rounded-lg hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors ml-1"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <CartItemsList 
+                        items={items} 
+                        updateQuantity={updateQuantity} 
+                        removeItem={removeItem} 
+                    />
 
-                    {/* Coupon Accordion */}
-                    <div className="glass-card p-4 rounded-2xl border border-border/40 shadow-sm">
-                        <button
-                            type="button"
-                            onClick={() => setShowCouponInput(!showCouponInput)}
-                            className="flex items-center justify-between w-full text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                            <span className="flex items-center gap-2">
-                                <Tag className="w-4 h-4" />
-                                {showCouponInput ? t("storefront.checkout.coupon.hide") : t("storefront.checkout.coupon.show")}
-                            </span>
-                            <motion.div animate={{ rotate: showCouponInput ? 180 : 0 }} className="text-muted-foreground">
-                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.13523 6.15803C3.3241 5.95657 3.64052 5.94637 3.84197 6.13523L7.5 9.56464L11.158 6.13523C11.3595 5.94637 11.6759 5.95657 11.8648 6.15803C12.0536 6.35949 12.0434 6.67591 11.842 6.86477L7.84197 10.6148C7.64964 10.7951 7.35036 10.7951 7.15803 10.6148L3.15803 6.86477C2.95657 6.67591 2.94637 6.35949 3.13523 6.15803Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                            </motion.div>
-                        </button>
-
-                        <AnimatePresence>
-                            {showCouponInput && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                                    animate={{ height: "auto", opacity: 1, marginTop: 12 }}
-                                    exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                                    className="overflow-hidden flex gap-2"
-                                >
-                                    <div className="flex-1 relative">
-                                        <Tag className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
-                                        <input
-                                            value={couponCode}
-                                            onChange={(e) => { setCouponCode(e.target.value); setValidatedCoupon(false); setDiscount(0); }}
-                                            placeholder={t("storefront.checkout.coupon.placeholder")}
-                                            className={`w-full h-12 ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} rounded-xl bg-background border border-border text-sm focus:outline-none focus:border-primary/50 shadow-sm`}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleApplyCoupon}
-                                        className="px-6 h-12 rounded-xl bg-secondary text-foreground text-sm font-semibold hover:bg-secondary/80 transition-colors border border-border/50 shadow-sm"
-                                    >
-                                        {t("storefront.checkout.coupon.apply")}
-                                    </button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                    {/* Coupon Section */}
+                    <CouponSection 
+                        couponCode={couponCode}
+                        setCouponCode={setCouponCode}
+                        showCouponInput={showCouponInput}
+                        setShowCouponInput={setShowCouponInput}
+                        handleApplyCoupon={handleApplyCoupon}
+                        setValidatedCoupon={setValidatedCoupon}
+                        setDiscount={setDiscount}
+                    />
 
                     {/* Order Summary */}
-                    <div className="glass-card rounded-2xl p-6 space-y-4 border border-border/40 shadow-sm">
-                        <h3 className="font-semibold text-lg pb-2 border-b border-border/50">{t("storefront.checkout.sectionTitles.summary")}</h3>
-                        <div className="space-y-3">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">{t("storefront.checkout.summary.subtotal")}</span>
-                                <span dir="ltr">{subtotal.toFixed(0)} {t("storefront.currency")}</span>
-                            </div>
-                            {discount > 0 && (
-                                <div className="flex justify-between text-sm text-emerald-500 font-medium">
-                                    <span>{t("storefront.checkout.summary.discount")} {validatedCoupon && <Check className="inline w-3 h-3 ml-1" />}</span>
-                                    <span dir="ltr">-{discount.toFixed(0)} {t("storefront.currency")}</span>
-                                </div>
-                            )}
-                            {orderType === "delivery" && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">{t("storefront.checkout.summary.deliveryFee")}</span>
-                                    {isFreeDelivery ? (
-                                        <span className="text-emerald-500 font-bold">{t("storefront.checkout.summary.free")}</span>
-                                    ) : (
-                                        <span dir="ltr">{effectiveDeliveryFee.toFixed(0)} {t("storefront.currency")}</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div className="border-t border-border/50 pt-4 flex justify-between font-bold text-xl">
-                            <span>{t("storefront.checkout.summary.total")}</span>
-                            <span className="text-primary" dir="ltr">{grandTotal.toFixed(0)} {t("storefront.currency")}</span>
-                        </div>
-                    </div>
+                    <OrderSummary 
+                        subtotal={subtotal}
+                        discount={discount}
+                        effectiveDeliveryFee={effectiveDeliveryFee}
+                        grandTotal={grandTotal}
+                        orderType={orderType}
+                        isOutOfZone={!!isOutOfZone}
+                        isFreeDelivery={isFreeDelivery}
+                        isFreeDeliveryCoupon={!!isFreeDeliveryCoupon}
+                        isAreaInZone={!!selectedZone}
+                        estimatedDeliveryTime={selectedZone?.estimated_delivery_time}
+                        validatedCoupon={validatedCoupon}
+                    />
 
                     {/* Submit Options */}
                     <div className="space-y-3">
@@ -726,7 +574,7 @@ export default function CheckoutPage() {
                             const isFormValid = () => {
                                 if (orderType === "dine_in") return !!tableNumber;
                                 if (orderType === "takeaway") return !!name && !!phone && !!carDetails;
-                                if (orderType === "delivery") return !!name && !!phone && !!areaName;
+                                if (orderType === "delivery") return !!name && !!phone && !!areaName && isMinOrderReached;
                                 return false;
                             };
                             const isDisabled = loading || !isFormValid();

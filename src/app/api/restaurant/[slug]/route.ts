@@ -1,19 +1,42 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { RATE_LIMITS } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
+
+// Simple in-memory rate limiter: max 30 requests per IP per minute
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = RATE_LIMITS.PUBLIC_API_PER_MIN;
+const RATE_WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+        return true;
+    }
+    if (entry.count >= RATE_LIMIT) return false;
+    entry.count++;
+    return true;
+}
 
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ slug: string }> }
 ) {
+    const ip = (request.headers as Headers).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (!checkRateLimit(ip)) {
+        return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const { slug } = await params;
     const supabase = await createClient();
 
     // Select only core columns first to avoid 500 errors if migrations are pending
     const { data: restaurant, error } = await supabase
         .from("restaurants")
-        .select("id, name, slug, primary_color, is_dine_in_enabled, is_takeaway_enabled, is_delivery_enabled, is_free_delivery, whatsapp_number, is_whatsapp_ordering_enabled")
+        .select("id, name, slug, primary_color, is_dine_in_enabled, is_takeaway_enabled, is_delivery_enabled, is_free_delivery, whatsapp_number, is_whatsapp_ordering_enabled, governorate, city, accept_out_of_zone_orders")
         .eq("slug", slug)
         .single();
 
@@ -36,7 +59,8 @@ export async function GET(
             is_delivery_enabled: true,
             is_free_delivery: false,
             whatsapp_number: null,
-            is_whatsapp_ordering_enabled: false
+            is_whatsapp_ordering_enabled: false,
+            accept_out_of_zone_orders: false
         });
     }
 
@@ -48,14 +72,14 @@ export async function GET(
     const [categoriesRes, productsRes] = await Promise.all([
         supabase
             .from("categories")
-            .select("*")
+            .select("id, name, name_en, name_ku, sort_order, is_hidden")
             .eq("restaurant_id", restaurant.id)
             .eq("is_hidden", false)
             .is("deleted_at", null)
             .order("sort_order", { ascending: true }),
         supabase
             .from("products")
-            .select("*, product_variants(*), product_addons(*)")
+            .select("id, name, name_en, name_ku, description, description_en, description_ku, price, image_url, category_id, is_available, product_variants(id, name, name_en, name_ku, price, is_available), product_addons(id, name, name_en, name_ku, price, is_required, max_selections)")
             .eq("restaurant_id", restaurant.id)
             .eq("is_available", true)
             .is("deleted_at", null)
