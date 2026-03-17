@@ -18,7 +18,7 @@ export async function getOrders(restaurantId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
         .from("orders")
-        .select("id, restaurant_id, order_type, status, subtotal, discount_amount, delivery_fee, total, table_number, customer_name, customer_phone, customer_address, notes, coupon_code, created_at, number_of_people, area_name, nearest_landmark, car_details, order_items(id, product_id, quantity, unit_price, item_name, variant_details, addons_details)")
+        .select("id, restaurant_id, order_type, status, subtotal, discount_amount, delivery_fee, total, table_number, customer_name, customer_phone, customer_address, coupon_code, created_at, number_of_people, area_name, nearest_landmark, car_details, order_items(id, product_id, quantity, unit_price, item_name, variant_details)")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false });
 
@@ -302,7 +302,7 @@ export async function createOrder(orderData: any) {
             discount_amount: calculatedDiscount,
             delivery_fee: calculatedDeliveryFee,
             total: calculatedTotal,
-            client_ip: clientIp !== 'unknown' ? clientIp : null,
+            items: [], // Schema requires this, though items are stored in order_items
         };
 
         const { data, error } = await adminClient
