@@ -424,7 +424,7 @@ export async function createOrder(orderData: any) {
 
 export async function updateOrderStatus(id: string, status: string) {
     try {
-        const validatedStatus = z.enum(['pending', 'confirmed', 'preparing', 'delivered', 'cancelled', 'completed', 'rejected']).parse(status);
+        const validatedStatus = z.enum(['pending', 'confirmed', 'preparing', 'ready', 'on_the_way', 'delivered', 'cancelled', 'completed', 'rejected']).parse(status);
 
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();

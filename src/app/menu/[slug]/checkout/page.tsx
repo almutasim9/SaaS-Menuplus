@@ -212,7 +212,7 @@ export default function CheckoutPage() {
 
         setLoading(true);
         try {
-            await createOrder({
+            const newOrder = await createOrder({
                 restaurant_id: restaurantId,
                 customer_name: name || "Guest",
                 customer_phone: phone || "N/A",
@@ -232,8 +232,10 @@ export default function CheckoutPage() {
                 status: "pending",
             });
 
-            setOrderPlaced(true);
             clearCart();
+            // Store for persistence
+            localStorage.setItem(`active_order_${slug}`, newOrder.id);
+            router.push(`/menu/${slug}/order/${newOrder.id}`);
         } catch (err: any) {
             const msg: string = err?.message ?? "";
             if (msg.startsWith("ITEMS_UNAVAILABLE:")) {

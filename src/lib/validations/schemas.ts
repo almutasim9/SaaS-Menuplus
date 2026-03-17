@@ -65,7 +65,7 @@ export const createOrderSchema = z.object({
     discount_amount: z.number().min(0).max(MAX_PRICE).default(0),
     delivery_fee: z.number().min(0).max(MAX_PRICE).default(0),
     total: z.number().min(0).max(MAX_PRICE),
-    status: z.enum(['pending', 'confirmed', 'preparing', 'delivered', 'cancelled', 'completed', 'rejected']).default('pending'),
+    status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'on_the_way', 'delivered', 'cancelled', 'completed', 'rejected']).default('pending'),
     coupon_code: z.string().max(100).optional().nullable(),
     order_type: z.enum(['dine_in', 'delivery', 'takeaway']),
     table_number: z.string().max(20).optional().nullable(),

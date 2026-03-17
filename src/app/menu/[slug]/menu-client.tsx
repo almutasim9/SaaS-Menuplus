@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useTranslation } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/dashboard/LanguageSwitcher";
+import { ActiveOrderBanner } from "@/components/menu/ActiveOrderBanner";
 
 interface MenuPageClientProps {
     restaurant: Restaurant;
@@ -146,6 +147,9 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                         </div>
                     )}
                 </div>
+
+                {/* Active Order Persistent Banner */}
+                <ActiveOrderBanner slug={slug} />
 
                 {/* Banner Wrapper */}
                 <div className="px-5 mt-2">
