@@ -15,6 +15,7 @@
         "submit": "Submit",
         "copy": "Copy",
         "copied": "Copied",
+        "upload": "Upload Image",
         "download": "Download",
         "share": "Share",
         "yes": "Yes",
@@ -281,10 +282,19 @@
         "products": "Products",
         "noProductsTitle": "No products found",
         "noProductsDesc": "Try searching with a different keyword",
+        "noSearchResults": "No results for \"{{query}}\"",
+        "noSearchResultsDesc": "Try a different search term",
+        "noCategoryProducts": "No products in this category yet",
+        "noCategoryProductsDesc": "Try another category",
+        "menuEmpty": "Menu is being prepared",
+        "menuEmptyDesc": "Please check back later",
         "subscriptionExpired": "We're sorry, the menu is currently unavailable due to an expired subscription.",
         "viewCart": "View Cart",
         "currency": "IQD",
         "startsFrom": "Starts from",
+        "loadMore": "Show more",
+        "addToCart": "Add to cart",
+        "addedToCart": "Added!",
         "selectOptionMessage": "Please select an option to continue",
         "checkout": {
             "orderPlaced": "Order Placed!",
@@ -310,8 +320,12 @@
             "fields": {
                 "tableNumber": "Table Number *",
                 "tableNumberPlaceholder": "e.g. 14",
+                "table": "Table Number *",
+                "tablePlaceholder": "e.g. 14",
                 "numPeople": "Number of People",
                 "numPeoplePlaceholder": "e.g. 2",
+                "people": "Number of People",
+                "peoplePlaceholder": "e.g. 2",
                 "name": "Name *",
                 "nameOptional": "Name (Optional)",
                 "namePlaceholder": "Your Name",
@@ -319,6 +333,8 @@
                 "phonePlaceholder": "Phone Number",
                 "carDetails": "Car Details *",
                 "carDetailsPlaceholder": "e.g. White Toyota Corolla - 1234 A B",
+                "car": "Car Details *",
+                "carPlaceholder": "e.g. White Toyota Corolla - 1234 A B",
                 "area": "Area *",
                 "areaPlaceholder": "Select your area",
                 "landmark": "Nearest Landmark (Optional)",
@@ -351,7 +367,9 @@
                 "dineInTable": "Please explicitly enter a table number",
                 "deliveryDetails": "Please fill Name, Phone and select an Area for delivery",
                 "takeawayDetails": "Please fill Name, Phone and Car Details for takeaway",
-                "general": "Failed to place order. Please try again."
+                "general": "Failed to place order. Please try again.",
+                "itemsUnavailable": "Some items are no longer available. Please update your cart",
+                "itemsModified": "Some options you selected are no longer available. Please update your cart"
             }
         },
         "itemsCount": "{{count}} items",
@@ -404,7 +422,9 @@
         "selectOption": "Select Option",
         "addExtras": "Add Extras",
         "addToOrder": "Add to Order",
-        "saveDiscount": "Save"
+        "saveDiscount": "Save",
+        "availableAt": "Available at {{time}}",
+        "notAvailableNow": "Not available now"
     },
     "auth": {
         "forgotPassword": "Forgot password?",

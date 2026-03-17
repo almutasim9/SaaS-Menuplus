@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSubscriptionStatus, upgradePlan, type PlanType } from "@/lib/actions/subscription";
+import { getSubscriptionStatus, upgradePlan } from "@/lib/actions/subscription";
+import { type PlanType } from "@/lib/constants";
 import {
     CreditCard,
     Zap,
@@ -19,9 +20,9 @@ import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
 
 const planDetails: Record<PlanType, { name: string; nameAr: string; price: string; icon: typeof Zap; color: string; gradient: string }> = {
-    free: { name: "Free", nameAr: "مجانية", price: "$0", icon: Zap, color: "text-gray-400", gradient: "from-gray-500/20 to-gray-600/10" },
-    pro: { name: "Pro", nameAr: "احترافية", price: "$25", icon: Crown, color: "text-emerald-400", gradient: "from-emerald-500/20 to-emerald-600/10" },
-    business: { name: "Business", nameAr: "أعمال", price: "$50", icon: Rocket, color: "text-violet-400", gradient: "from-violet-500/20 to-violet-600/10" },
+    free:     { name: "Free",     nameAr: "مجانية",   price: "مجاني",      icon: Zap,    color: "text-gray-400",    gradient: "from-gray-500/20 to-gray-600/10" },
+    business: { name: "Business", nameAr: "أعمال",    price: "22,000 د.ع", icon: Crown,  color: "text-emerald-400", gradient: "from-emerald-500/20 to-emerald-600/10" },
+    pro:      { name: "Pro",      nameAr: "احترافية", price: "39,000 د.ع", icon: Rocket, color: "text-violet-400",  gradient: "from-violet-500/20 to-violet-600/10" },
 };
 
 const allFeatures = [
@@ -175,7 +176,7 @@ export default function BillingPage() {
             <div>
                 <h3 className="text-lg font-bold mb-4">مقارنة الخطط</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {(["free", "pro", "business"] as PlanType[]).map((plan) => {
+                    {(["free", "business", "pro"] as PlanType[]).map((plan) => {
                         const detail = planDetails[plan];
                         const Icon = detail.icon;
                         const isCurrent = currentPlan === plan;
@@ -201,8 +202,8 @@ export default function BillingPage() {
                                 <ul className="space-y-2.5 mb-6 flex-1">
                                     {allFeatures.map((f) => {
                                         const hasFeature = (plan === "free" && ["qr_menu", "orders", "basic_analytics"].includes(f.key)) ||
-                                            (plan === "pro" && f.key !== "custom_domain" && f.key !== "priority_support") ||
-                                            plan === "business";
+                                            (plan === "business" && f.key !== "custom_domain" && f.key !== "priority_support") ||
+                                            plan === "pro";
                                         return (
                                             <li key={f.key} className="flex items-center gap-2 text-sm">
                                                 <CheckCircle2 className={`w-4 h-4 shrink-0 ${hasFeature ? "text-emerald-500" : "text-muted-foreground/30"}`} />
@@ -226,7 +227,7 @@ export default function BillingPage() {
                                         ) : (
                                             <>
                                                 <ArrowUpRight className="w-4 h-4" />
-                                                {currentPlan === "free" || (currentPlan === "pro" && plan === "business") ? "ترقية" : "تغيير"}
+                                                {currentPlan === "free" || (currentPlan === "business" && plan === "pro") ? "ترقية" : "تغيير"}
                                             </>
                                         )}
                                     </button>

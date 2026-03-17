@@ -17,11 +17,11 @@ const ADDON_LABELS: Record<string, string> = {
     custom_branding: "براند",
     custom_domain: "دومين",
 };
-const planIcons: Record<string, typeof Zap> = { free: Zap, pro: Crown, business: Rocket };
+const planIcons: Record<string, typeof Zap> = { free: Zap, business: Crown, pro: Rocket };
 const planColors: Record<string, string> = {
-    free: "text-gray-400 bg-gray-500/10",
-    pro: "text-emerald-400 bg-emerald-500/10",
-    business: "text-violet-400 bg-violet-500/10",
+    free:     "text-gray-400 bg-gray-500/10",
+    business: "text-emerald-400 bg-emerald-500/10",
+    pro:      "text-violet-400 bg-violet-500/10",
 };
 const planLabels: Record<string, string> = { free: "مجاني", pro: "احترافي", business: "أعمال" };
 

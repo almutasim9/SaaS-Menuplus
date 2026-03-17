@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -93,16 +93,14 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
                     <UtensilsCrossed className="w-5 h-5" />
                     لوحة تحكم المطعم
                 </Link>
-                <form action={signOut}>
-                    <Button
-                        type="submit"
-                        variant="ghost"
-                        className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        تسجيل الخروج
-                    </Button>
-                </form>
+                <Button
+                    onClick={async () => { await signOut(); window.location.href = "/login"; }}
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                >
+                    <LogOut className="w-5 h-5" />
+                    تسجيل الخروج
+                </Button>
             </div>
         </div>
     );
@@ -110,6 +108,7 @@ function AdminSidebarContent({ pathname }: { pathname: string }) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
     const [open, setOpen] = useState(false);
 
     return (

@@ -93,7 +93,7 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={onClose}
-                    className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 />
 
                 {/* Modal */}
@@ -107,7 +107,7 @@ export function ProductCustomizationModal({ isOpen, onClose, product }: ProductC
                     {/* Header */}
                     <div className="relative aspect-video bg-secondary/30 flex-shrink-0">
                         {product.image_url ? (
-                            <NextImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" fill unoptimized />
+                            <NextImage src={product.image_url} alt={product.name} className="w-full h-full object-cover" fill sizes="(max-width: 640px) 100vw, 512px" priority />
                         ) : (
                             <div className="w-full h-full bg-secondary/50" />
                         )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { signOut } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/client";
@@ -172,16 +172,14 @@ function DesktopSidebar({ pathname, theme, toggleTheme, userRole }: { pathname: 
                         <><Moon className="w-5 h-5" /> Dark Mode</>
                     )}
                 </button>
-                <form action={signOut}>
-                    <Button
-                        type="submit"
-                        variant="ghost"
-                        className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        {t("sidebar.logout")}
-                    </Button>
-                </form>
+                <Button
+                    onClick={async () => { await signOut(); window.location.href = "/login"; }}
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl"
+                >
+                    <LogOut className="w-5 h-5" />
+                    {t("sidebar.logout")}
+                </Button>
             </div>
         </div>
     );
@@ -193,6 +191,7 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { theme, setTheme, resolvedTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);

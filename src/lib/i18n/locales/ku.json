@@ -15,6 +15,7 @@
         "submit": "ناردن",
         "copy": "لەبەرگرتنەوە",
         "copied": "لەبەرگیرایەوە",
+        "upload": "وێنەی بارکردن",
         "download": "داگرتن",
         "share": "هاوبەشکردن",
         "yes": "بەڵێ",
@@ -283,10 +284,19 @@
         "products": "بەرهەمەکان",
         "noProductsTitle": "هیچ بەرهەمێک نەدۆزرایەوە",
         "noProductsDesc": "هەوڵبدە بە وشەیەکی جیاواز بگەڕێیت",
+        "noSearchResults": "هیچ ئەنجامێک نییە بۆ \"{{query}}\"",
+        "noSearchResultsDesc": "وشەیەکی تر بنووسە",
+        "noCategoryProducts": "هێشتا هیچ بەرهەمێک لەم بەشەدا نییە",
+        "noCategoryProductsDesc": "بەشێکی تر هەوڵ بدە",
+        "menuEmpty": "مینیو ئامادە دەکرێت",
+        "menuEmptyDesc": "تکایە دواتر سەردان بکە",
         "subscriptionExpired": "ببوورن، مینووەکە ئێستا بەردەست نییە بەهۆی کۆتایی هاتنی ماوەی بەشداری کردن.",
         "viewCart": "پیشاندانی سەبەتە",
         "currency": "د.ع",
         "startsFrom": "دەستپێدەکات لە",
+        "loadMore": "زیاتر نیشان بدە",
+        "addToCart": "زیادکردن بۆ سەبەتە",
+        "addedToCart": "زیادکرا!",
         "selectOptionMessage": "تکایە یەکێک لە بژاردەکان هەڵبژێرە بۆ بەردەوام بوون",
         "checkout": {
             "orderPlaced": "داواکاری پشتڕاستکرایەوە!",
@@ -312,8 +322,12 @@
             "fields": {
                 "tableNumber": "ژمارەی مێز *",
                 "tableNumberPlaceholder": "نموونە: 14",
+                "table": "ژمارەی مێز *",
+                "tablePlaceholder": "نموونە: 14",
                 "numPeople": "ژمارەی کەسەکان",
                 "numPeoplePlaceholder": "نموونە: 2",
+                "people": "ژمارەی کەسەکان",
+                "peoplePlaceholder": "نموونە: 2",
                 "name": "ناو *",
                 "nameOptional": "ناو (ئارەزوومەندانە)",
                 "namePlaceholder": "ناوی خۆت",
@@ -321,6 +335,8 @@
                 "phonePlaceholder": "ژمارەی تەلەفۆن",
                 "carDetails": "زانیاری ئۆتۆمبێل *",
                 "carDetailsPlaceholder": "نموونە: تۆیۆتا کۆرۆلا سپی - ١٢٣٤",
+                "car": "زانیاری ئۆتۆمبێل *",
+                "carPlaceholder": "نموونە: تۆیۆتا کۆرۆلا سپی - ١٢٣٤",
                 "area": "ناوچە *",
                 "areaPlaceholder": "ناوچەکەت هەڵبژێرە",
                 "landmark": "نزیکترین نیشانە (ئارەزوومەندانە)",
@@ -353,7 +369,9 @@
                 "dineInTable": "تکایە بە ڕوونی ژمارەی مێزەکە بنووسە",
                 "deliveryDetails": "تکایە ناو، ژمارەی مێز و ناوچەی گەیاندن پڕبکەوە",
                 "takeawayDetails": "تکایە ناو، ژمارەی مێز و زانیاری ئۆتۆمبێل بۆ بردنە دەرەوە پڕبکەوە",
-                "general": "داواکارییەکە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدەرەوە."
+                "general": "داواکارییەکە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدەرەوە.",
+                "itemsUnavailable": "هەندێک بەرهەم ئێستا بەردەست نییە. تکایە سەبەتەکەت نوێ بکەرەوە",
+                "itemsModified": "هەندێک بژاردەی هەڵبژێردراو ئێستا بەردەست نییە. تکایە سەبەتەکەت نوێ بکەرەوە"
             }
         },
         "itemsCount": "{{count}} بابەت",
@@ -406,7 +424,9 @@
         "selectOption": "هەڵبژاردنی تایبەتمەندی",
         "addExtras": "زیادکراوەکان",
         "addToOrder": "زیادکردن بۆ داواکاری",
-        "saveDiscount": "پاشەکەوت"
+        "saveDiscount": "پاشەکەوت",
+        "availableAt": "بەردەستە لە ساتی {{time}}",
+        "notAvailableNow": "ئێستا بەردەست نییە"
     },
     "auth": {
         "forgotPassword": "تێپەڕوشەت لەبير چووە؟",

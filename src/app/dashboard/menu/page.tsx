@@ -298,6 +298,11 @@ export default function MenuItemsPage() {
 
     const [activeId, setActiveId] = useState<string | null>(null);
 
+    // Live preview state
+    const [previewName, setPreviewName] = useState("");
+    const [previewPrice, setPreviewPrice] = useState("");
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+
     // Availability Data
     const { availability: schedule, updateAvailability, isLoading: isSchedLoading } = useProductAvailability(editingProduct?.id || null);
     const { data: hasAccess } = useFeatureAccess(restaurantId, "product_scheduling");
@@ -752,7 +757,7 @@ export default function MenuItemsPage() {
                         <Plus className="w-4 h-4 mr-2" />
                         {t("menu.addCategory")}
                     </Button>
-                    <Button className="gradient-emerald text-white rounded-xl shadow-md" onClick={() => { setEditingProduct(null); setVariants([]); setAddons([]); setShowTranslations(false); setProductDialogOpen(true); }}>
+                    <Button className="gradient-emerald text-white rounded-xl shadow-md" onClick={() => { setEditingProduct(null); setVariants([]); setAddons([]); setShowTranslations(false); setPreviewName(""); setPreviewPrice(""); setPreviewImage(null); setProductDialogOpen(true); }}>
                         <Plus className="w-4 h-4 mr-2" />
                         {t("menu.addItem")}
                     </Button>
@@ -829,11 +834,16 @@ export default function MenuItemsPage() {
                                             setEditingProduct(p);
                                             setVariants(p.product_variants?.map(v => ({ name: v.name, name_en: v.name_en || '', name_ku: v.name_ku || '', price: v.price.toString() })) || []);
                                             setAddons(p.product_addons?.map(a => ({ name: a.name, name_en: a.name_en || '', name_ku: a.name_ku || '', price: a.price.toString() })) || []);
-                                            
+
                                             // Check if any translations exist to auto-show them
                                             const hasTranslations = !!(p.name_en || p.name_ku || p.description_en || p.description_ku);
                                             setShowTranslations(hasTranslations);
-                                            
+
+                                            // Initialize live preview
+                                            setPreviewName(p.name || "");
+                                            setPreviewPrice(p.price?.toString() || "");
+                                            setPreviewImage(p.image_url || null);
+
                                             setProductDialogOpen(true);
                                         }}
                                         onDeleteProduct={handleDeleteProduct}
@@ -877,7 +887,10 @@ export default function MenuItemsPage() {
             </Dialog>
 
             <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
-                <DialogContent className="glass-card border-border/50 rounded-2xl sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="glass-card border-border/50 rounded-2xl sm:max-w-4xl max-h-[90vh] overflow-hidden p-0">
+                    <div className="flex h-full max-h-[90vh]">
+                        {/* ── Form Side ── */}
+                        <div className="flex-1 overflow-y-auto p-6">
                     <DialogHeader>
                         <DialogTitle>{editingProduct ? t("menu.editProduct") : t("menu.addProduct")}</DialogTitle>
                     </DialogHeader>
@@ -911,7 +924,7 @@ export default function MenuItemsPage() {
                                                 <Type className="w-3.5 h-3.5 text-muted-foreground" />
                                                 {t("menu.nameAr")} *
                                             </Label>
-                                            <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl h-11 bg-secondary/30 border-white/5 focus:ring-primary/20" />
+                                            <Input name="name" defaultValue={editingProduct?.name} required className="rounded-xl h-11 bg-secondary/30 border-white/5 focus:ring-primary/20" onChange={e => setPreviewName(e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-sm font-semibold flex items-center gap-2">
@@ -1017,7 +1030,7 @@ export default function MenuItemsPage() {
                                                 {t("common.price")} ({t("storefront.currency")}) *
                                             </Label>
                                             <div className="relative">
-                                                <Input name="price" type="text" defaultValue={editingProduct?.price} onChange={(e) => e.target.value = arabicToEnglishNumbers(e.target.value)} required className="rounded-xl h-11 bg-secondary/30 border-white/5 pr-12 font-bold text-lg" />
+                                                <Input name="price" type="text" defaultValue={editingProduct?.price} onChange={(e) => { e.target.value = arabicToEnglishNumbers(e.target.value); setPreviewPrice(e.target.value); }} required className="rounded-xl h-11 bg-secondary/30 border-white/5 pr-12 font-bold text-lg" />
                                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground bg-white/5 px-2 py-1 rounded-md">
                                                     {t("storefront.currency")}
                                                 </div>
@@ -1034,7 +1047,7 @@ export default function MenuItemsPage() {
                                                     <Plus className="w-5 h-5 text-primary/40 mb-1" />
                                                     <span className="text-[10px] uppercase font-bold text-primary/60 tracking-widest">{t("common.upload") || "رفع صورة"}</span>
                                                 </div>
-                                                <Input name="image" type="file" accept="image/*" className="rounded-xl h-14 bg-transparent border-none opacity-0 cursor-pointer relative z-10" />
+                                                <Input name="image" type="file" accept="image/*" className="rounded-xl h-14 bg-transparent border-none opacity-0 cursor-pointer relative z-10" onChange={e => { const f = e.target.files?.[0]; if (f) setPreviewImage(URL.createObjectURL(f)); }} />
                                             </div>
                                             {editingProduct?.image_url && (
                                                 <div className="flex items-center gap-2 mt-2 p-2 bg-secondary/20 rounded-xl border border-white/5">
@@ -1365,6 +1378,39 @@ export default function MenuItemsPage() {
                         </div>
 
                     </form>
+                        </div>
+
+                        {/* ── Live Preview Side ── */}
+                        <div className="hidden sm:flex w-64 flex-col border-l border-border/30 bg-secondary/5 p-5 gap-4 shrink-0">
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">معاينة مباشرة</p>
+
+                            {/* Phone frame */}
+                            <div className="flex-1 flex items-start justify-center pt-2">
+                                <div className="w-full max-w-[200px] rounded-2xl border border-border/40 bg-background shadow-sm overflow-hidden">
+                                    {/* Product image */}
+                                    <div className="w-full aspect-square bg-secondary/30 flex items-center justify-center overflow-hidden">
+                                        {previewImage ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={previewImage} alt="preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <ImageIcon2 className="w-10 h-10 text-muted-foreground/30" />
+                                        )}
+                                    </div>
+                                    {/* Product info */}
+                                    <div className="p-3 space-y-1">
+                                        <p className="text-sm font-bold leading-tight line-clamp-2">
+                                            {previewName || <span className="text-muted-foreground/40 italic text-xs">اسم المنتج</span>}
+                                        </p>
+                                        <p className="text-sm font-bold text-primary">
+                                            {previewPrice ? `${Number(previewPrice).toLocaleString()} د.ع` : <span className="text-muted-foreground/40 italic text-xs">السعر</span>}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p className="text-[10px] text-muted-foreground/50 text-center">كما سيظهر للعميل</p>
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
 

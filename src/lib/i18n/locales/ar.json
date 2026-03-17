@@ -15,6 +15,7 @@
         "submit": "إرسال",
         "copy": "نسخ",
         "copied": "تم النسخ",
+        "upload": "رفع صورة",
         "download": "تحميل",
         "share": "مشاركة",
         "yes": "نعم",
@@ -281,10 +282,19 @@
         "products": "المنتجات",
         "noProductsTitle": "لم يتم العثور على منتجات",
         "noProductsDesc": "حاول البحث بكلمة مختلفة",
+        "noSearchResults": "لا توجد نتائج لـ \"{{query}}\"",
+        "noSearchResultsDesc": "جرب كلمة بحث مختلفة",
+        "noCategoryProducts": "لا توجد منتجات في هذا القسم حالياً",
+        "noCategoryProductsDesc": "جرب قسماً آخر",
+        "menuEmpty": "القائمة قيد الإعداد",
+        "menuEmptyDesc": "يرجى المحاولة لاحقاً",
         "subscriptionExpired": "نعتذر، المنيو غير متاح حالياً بسبب انتهاء فترة الاشتراك.",
         "viewCart": "عرض السلة",
         "currency": "د.ع",
         "startsFrom": "يبدأ من",
+        "loadMore": "عرض المزيد",
+        "addToCart": "إضافة للسلة",
+        "addedToCart": "تمت الإضافة",
         "selectOptionMessage": "يرجى اختيار أحد الخيارات للمتابعة",
         "checkout": {
             "orderPlaced": "تم تأكيد الطلب!",
@@ -310,8 +320,12 @@
             "fields": {
                 "tableNumber": "رقم الطاولة *",
                 "tableNumberPlaceholder": "مثال: 14",
+                "table": "رقم الطاولة *",
+                "tablePlaceholder": "مثال: 14",
                 "numPeople": "عدد الأشخاص",
                 "numPeoplePlaceholder": "مثال: 2",
+                "people": "عدد الأشخاص",
+                "peoplePlaceholder": "مثال: 2",
                 "name": "الاسم *",
                 "nameOptional": "الاسم (اختياري)",
                 "namePlaceholder": "اسمك",
@@ -319,6 +333,8 @@
                 "phonePlaceholder": "رقم الهاتف",
                 "carDetails": "تفاصيل السيارة *",
                 "carDetailsPlaceholder": "مثال: تويوتا كورولا بيضاء - ١٢٣٤",
+                "car": "تفاصيل السيارة *",
+                "carPlaceholder": "مثال: تويوتا كورولا بيضاء - ١٢٣٤",
                 "area": "المنطقة *",
                 "areaPlaceholder": "اختر منطقتك",
                 "landmark": "أقرب نقطة دالة (اختياري)",
@@ -351,7 +367,9 @@
                 "dineInTable": "يرجى إدخال رقم الطاولة صراحةً",
                 "deliveryDetails": "يرجى ملء الاسم ورقم الهاتف واختيار المنطقة للتوصيل",
                 "takeawayDetails": "يرجى ملء الاسم ورقم الهاتف وتفاصيل السيارة للاستلام",
-                "general": "فشل في إتمام الطلب. يرجى المحاولة مرة أخرى."
+                "general": "فشل في إتمام الطلب. يرجى المحاولة مرة أخرى.",
+                "itemsUnavailable": "بعض المنتجات لم تعد متوفرة. يرجى تحديث سلتك",
+                "itemsModified": "بعض الخيارات التي اخترتها لم تعد متوفرة. يرجى تحديث سلتك"
             }
         },
         "itemsCount": "{{count}} أصناف",
@@ -404,7 +422,9 @@
         "selectOption": "اختر من الخصائص",
         "addExtras": "إضافات",
         "addToOrder": "أضف إلى الطلب",
-        "saveDiscount": "توفير"
+        "saveDiscount": "توفير",
+        "availableAt": "يتوفر الساعة {{time}}",
+        "notAvailableNow": "غير متوفر حالياً"
     },
     "auth": {
         "forgotPassword": "نسيت كلمة المرور؟",

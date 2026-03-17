@@ -6,7 +6,7 @@ export const variantSchema = z.object({
     name: z.string().min(1, "Variant name is required"),
     name_en: z.string().nullable().optional(),
     name_ku: z.string().nullable().optional(),
-    price: z.number().min(0, "Price must be 0 or greater").max(MAX_PRICE),
+    price: z.coerce.number().min(0, "Price must be 0 or greater").max(MAX_PRICE),
     is_active: z.boolean().default(true),
 });
 
@@ -15,7 +15,7 @@ export const addonSchema = z.object({
     name: z.string().min(1, "Add-on name is required"),
     name_en: z.string().nullable().optional(),
     name_ku: z.string().nullable().optional(),
-    price: z.number().min(0, "Price must be 0 or greater").max(MAX_PRICE),
+    price: z.coerce.number().min(0, "Price must be 0 or greater").max(MAX_PRICE),
     is_active: z.boolean().default(true),
 });
 
@@ -33,9 +33,6 @@ export const productSchema = z.object({
     image_url: z.string().url().nullable().optional(),
     is_available: z.boolean().default(true),
     is_hidden: z.boolean().default(false),
-    stock_count: z.number().int().min(0).max(999999).nullable().optional(),
-    calories: z.number().int().min(0).max(99999).nullable().optional(),
-    prep_time_minutes: z.number().int().min(0).max(1440).nullable().optional(),
     variants: z.array(variantSchema).optional(),
     addons: z.array(addonSchema).optional(),
 });

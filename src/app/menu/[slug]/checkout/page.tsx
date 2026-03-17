@@ -234,8 +234,16 @@ export default function CheckoutPage() {
 
             setOrderPlaced(true);
             clearCart();
-        } catch {
-            toast.error(t("storefront.checkout.errors.general"));
+        } catch (err: any) {
+            const msg: string = err?.message ?? "";
+            if (msg.startsWith("ITEMS_UNAVAILABLE:")) {
+                const names = msg.replace("ITEMS_UNAVAILABLE:", "");
+                toast.error(`${t("storefront.checkout.errors.itemsUnavailable")}: ${names}`);
+            } else if (msg.startsWith("ITEMS_MODIFIED")) {
+                toast.error(t("storefront.checkout.errors.itemsModified"));
+            } else {
+                toast.error(t("storefront.checkout.errors.general"));
+            }
         }
         setLoading(false);
     };
@@ -330,8 +338,16 @@ export default function CheckoutPage() {
             clearCart();
             window.location.href = url; // Hard redirect instead of setOrderPlaced, or open in new tab
 
-        } catch {
-            toast.error(t("storefront.checkout.errors.general"));
+        } catch (err: any) {
+            const msg: string = err?.message ?? "";
+            if (msg.startsWith("ITEMS_UNAVAILABLE:")) {
+                const names = msg.replace("ITEMS_UNAVAILABLE:", "");
+                toast.error(`${t("storefront.checkout.errors.itemsUnavailable")}: ${names}`);
+            } else if (msg.startsWith("ITEMS_MODIFIED")) {
+                toast.error(t("storefront.checkout.errors.itemsModified"));
+            } else {
+                toast.error(t("storefront.checkout.errors.general"));
+            }
             setLoading(false);
         }
     };

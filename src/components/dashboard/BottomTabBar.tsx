@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/lib/actions/auth";
 import {
     LayoutDashboard,
@@ -43,6 +43,7 @@ const moreItems = [
 
 export function BottomTabBar() {
     const pathname = usePathname();
+    const router = useRouter();
     const [showMore, setShowMore] = useState(false);
 
     const isTabActive = (href: string) => {
@@ -92,15 +93,13 @@ export function BottomTabBar() {
                             })}
 
                             {/* Logout */}
-                            <form action={signOut}>
-                                <button
-                                    type="submit"
-                                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm text-red-400 hover:bg-red-500/5 transition-colors mt-2"
-                                >
-                                    <LogOut className="w-5 h-5" />
-                                    تسجيل الخروج
-                                </button>
-                            </form>
+                            <button
+                                onClick={async () => { await signOut(); router.push("/login"); }}
+                                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm text-red-400 hover:bg-red-500/5 transition-colors mt-2"
+                            >
+                                <LogOut className="w-5 h-5" />
+                                تسجيل الخروج
+                            </button>
                         </div>
                     </div>
                 </div>

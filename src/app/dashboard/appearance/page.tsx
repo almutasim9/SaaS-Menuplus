@@ -10,12 +10,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { getRestaurantAppearance, updateAppearance } from "@/lib/actions/appearance";
-import { Palette, Upload, Check, UtensilsCrossed, ImageIcon, Facebook, Instagram, Twitter, Music2, Type, LayoutTemplate, Plus } from "lucide-react";
+import { getSubscriptionStatus } from "@/lib/actions/subscription";
+import { Palette, Check, UtensilsCrossed, ImageIcon, Facebook, Instagram, Twitter, Music2, Type, LayoutTemplate, Plus, Lock, Crown } from "lucide-react";
 import NextImage from "next/image";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Json } from "@/lib/types/database.types";
 import { arabicToEnglishNumbers } from "@/lib/utils";
+import Link from "next/link";
+
+function FeatureLock({ feature, plan = "business" }: { feature: string; plan?: "business" | "pro" }) {
+    return (
+        <div className="absolute inset-0 z-10 rounded-2xl backdrop-blur-[2px] bg-background/60 flex flex-col items-center justify-center gap-3 text-center p-6">
+            <div className="w-12 h-12 rounded-xl bg-secondary/80 flex items-center justify-center">
+                <Lock className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <div>
+                <p className="text-sm font-semibold">
+                    {plan === "pro" ? "ميزة Pro" : "ميزة Business+"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{feature}</p>
+            </div>
+            <Link href="/dashboard/billing">
+                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary/90 transition-colors">
+                    <Crown className="w-3.5 h-3.5" /> ترقية الخطة
+                </span>
+            </Link>
+        </div>
+    );
+}
 
 const presetColors = [
     "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#f59e0b",
@@ -28,6 +51,8 @@ export default function AppearancePage() {
     const [saving, setSaving] = useState(false);
     const [restaurantId, setRestaurantId] = useState<string | null>(null);
     const [restaurantName, setRestaurantName] = useState("");
+    const [hasTheme, setHasTheme] = useState(false);
+    const [hasWhatsapp, setHasWhatsapp] = useState(false);
 
     // Images
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -77,7 +102,12 @@ export default function AppearancePage() {
             if (profile?.restaurant_id) {
                 setRestaurantId(profile.restaurant_id);
                 try {
-                    const appearance = await getRestaurantAppearance(profile.restaurant_id);
+                    const [appearance, subscription] = await Promise.all([
+                        getRestaurantAppearance(profile.restaurant_id),
+                        getSubscriptionStatus(profile.restaurant_id),
+                    ]);
+                    setHasTheme(subscription?.features.includes("theme_customization") ?? false);
+                    setHasWhatsapp(subscription?.features.includes("whatsapp_ordering") ?? false);
                     if (appearance) {
                         setPrimaryColor(appearance.primary_color);
                         setLogoUrl(appearance.logo_url);
@@ -200,7 +230,8 @@ export default function AppearancePage() {
                         {/* Branding Tab */}
                         <TabsContent value="branding" className="space-y-6">
                             {/* Brand Colors */}
-                            <div className="glass-card rounded-2xl p-6 space-y-6">
+                            <div className="glass-card rounded-2xl p-6 space-y-6 relative overflow-hidden">
+                                {!hasTheme && <FeatureLock feature="تخصيص الألوان والهوية البصرية" />}
                                 <div className="flex items-center gap-3 mb-2">
                                     <Palette className="w-5 h-5 text-primary" />
                                     <h2 className="text-lg font-semibold">Brand Colors</h2>
@@ -312,7 +343,8 @@ export default function AppearancePage() {
 
                         {/* Layout Tab */}
                         <TabsContent value="layout" className="space-y-6">
-                            <div className="glass-card rounded-2xl p-6 space-y-6">
+                            <div className="glass-card rounded-2xl p-6 space-y-6 relative overflow-hidden">
+                                {!hasTheme && <FeatureLock feature="تخصيص تخطيط القائمة والخطوط" />}
                                 <div className="flex items-center gap-3 mb-2">
                                     <LayoutTemplate className="w-5 h-5 text-primary" />
                                     <h2 className="text-lg font-semibold">Layout & Style Settings</h2>
@@ -404,7 +436,8 @@ export default function AppearancePage() {
                                 </div>
 
                                 {/* WhatsApp Integrations */}
-                                <div className="space-y-4 pt-6 border-t border-border/50">
+                                <div className="space-y-4 pt-6 border-t border-border/50 relative">
+                                    {!hasWhatsapp && <FeatureLock feature="استقبال الطلبات عبر واتساب" />}
                                     <div className="flex items-center gap-3 mb-2">
                                         <h3 className="text-md font-semibold text-primary">WhatsApp Ordering</h3>
                                     </div>

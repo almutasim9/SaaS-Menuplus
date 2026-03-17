@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 const MAX_EARLY_ADOPTERS = 50;
 
-const PLAN_ICONS: Record<string, typeof Zap> = { free: Zap, pro: Crown, business: Rocket };
+const PLAN_ICONS: Record<string, typeof Zap> = { free: Zap, business: Crown, pro: Rocket };
 const PLAN_LABELS: Record<string, string> = { free: "مجاني", pro: "احترافي", business: "أعمال" };
 const PLAN_NORMAL_PRICES: Record<string, number> = { free: 0, business: 22, pro: 39 };
 const PLAN_EARLY_PRICES: Record<string, number> = { free: 0, business: 15, pro: 29 };

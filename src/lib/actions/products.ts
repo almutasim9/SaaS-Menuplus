@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { productSchema } from "@/lib/validations/schemas";
 import { z } from "zod";
@@ -97,22 +97,23 @@ export async function createProduct(formData: FormData) {
         }
 
         const supabase = await createClient();
+        const adminClient = createAdminClient();
 
         let imageUrl: string | null = null;
 
         if (imageFile && imageFile.size > 0) {
             const fileExt = imageFile.name.split(".").pop();
             const fileName = `${validatedData.restaurant_id}/${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await adminClient.storage
                 .from("menu-assets")
                 .upload(fileName, imageFile);
 
-            if (!uploadError) {
-                const { data: { publicUrl } } = supabase.storage
-                    .from("menu-assets")
-                    .getPublicUrl(fileName);
-                imageUrl = publicUrl;
-            }
+            if (uploadError) throw new Error(`فشل رفع الصورة: ${uploadError.message}`);
+
+            const { data: { publicUrl } } = adminClient.storage
+                .from("menu-assets")
+                .getPublicUrl(fileName);
+            imageUrl = publicUrl;
         }
 
         const { data, error } = await supabase
@@ -130,9 +131,6 @@ export async function createProduct(formData: FormData) {
                 compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
                 is_available: validatedData.is_available,
                 is_hidden: validatedData.is_hidden,
-                stock_count: validatedData.stock_count,
-                calories: validatedData.calories,
-                prep_time_minutes: validatedData.prep_time_minutes,
                 image_url: imageUrl,
             })
             .select()
@@ -169,6 +167,7 @@ export async function createProduct(formData: FormData) {
         }
 
         revalidatePath("/dashboard/menu");
+        revalidatePath("/menu/[slug]", "page");
         return data;
     } catch (e: any) {
         if (e instanceof z.ZodError) {
@@ -201,9 +200,6 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: formData.get("is_available") === "true",
             is_hidden: formData.get("is_hidden") === "true",
-            stock_count: formData.get("stock_count") ? parseInt(formData.get("stock_count") as string) : null,
-            calories: formData.get("calories") ? parseInt(formData.get("calories") as string) : null,
-            prep_time_minutes: formData.get("prep_time_minutes") ? parseInt(formData.get("prep_time_minutes") as string) : null,
             variants: variantsJson ? JSON.parse(variantsJson) : undefined,
             addons: addonsJson ? JSON.parse(addonsJson) : undefined,
         };
@@ -217,6 +213,7 @@ export async function updateProduct(id: string, formData: FormData) {
         }
 
         const supabase = await createClient();
+        const adminClient = createAdminClient();
 
         const updateData: Record<string, unknown> = {
             category_id: validatedData.category_id,
@@ -230,24 +227,21 @@ export async function updateProduct(id: string, formData: FormData) {
             compare_at_price: formData.get("compare_at_price") ? parseFloat(formData.get("compare_at_price") as string) : null,
             is_available: validatedData.is_available,
             is_hidden: validatedData.is_hidden,
-            stock_count: validatedData.stock_count,
-            calories: validatedData.calories,
-            prep_time_minutes: validatedData.prep_time_minutes,
         };
 
         if (imageFile && imageFile.size > 0) {
             const fileExt = imageFile.name.split(".").pop();
             const fileName = `${validatedData.restaurant_id}/${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await adminClient.storage
                 .from("menu-assets")
                 .upload(fileName, imageFile);
 
-            if (!uploadError) {
-                const { data: { publicUrl } } = supabase.storage
-                    .from("menu-assets")
-                    .getPublicUrl(fileName);
-                updateData.image_url = publicUrl;
-            }
+            if (uploadError) throw new Error(`فشل رفع الصورة: ${uploadError.message}`);
+
+            const { data: { publicUrl } } = adminClient.storage
+                .from("menu-assets")
+                .getPublicUrl(fileName);
+            updateData.image_url = publicUrl;
         }
 
         const { data, error } = await supabase
@@ -290,6 +284,7 @@ export async function updateProduct(id: string, formData: FormData) {
         }
 
         revalidatePath("/dashboard/menu");
+        revalidatePath("/menu/[slug]", "page");
         return data;
     } catch (e: any) {
         if (e instanceof z.ZodError) {

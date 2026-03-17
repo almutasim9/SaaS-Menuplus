@@ -33,6 +33,7 @@ export default async function MenuPage({
             .select("*, product_variants(*), product_addons(*), product_availability(*)")
             .eq("restaurant_id", restaurant.id)
             .eq("is_available", true)
+            .eq("is_hidden", false)
             .is("deleted_at", null)
             .order("created_at", { ascending: false }),
     ]);

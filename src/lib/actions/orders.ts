@@ -9,6 +9,7 @@ import { headers } from "next/headers";
 import { sendPushNotification } from "@/lib/supabase/firebase-admin";
 import { requireRestaurantOwnership } from "@/lib/actions/_auth-guard";
 import { RATE_LIMITS } from "@/lib/constants";
+import { isProductCurrentlyAvailable } from "@/lib/utils/availability";
 
 export async function getOrders(restaurantId: string) {
     // Ensure the caller owns this restaurant
@@ -88,10 +89,10 @@ export async function createOrder(orderData: any) {
             .map((item: any) => item.id)
             .filter(Boolean);
 
-        // Fetch all products for this restaurant in one query
+        // Fetch all products for this restaurant in one query (including availability schedule)
         const { data: dbProducts, error: productsError } = await adminClient
             .from("products")
-            .select("id, price, name, is_available")
+            .select("id, price, name, is_available, product_availability(*)")
             .in("id", productIds)
             .eq("restaurant_id", validatedData.restaurant_id)
             .is("deleted_at", null);
@@ -99,6 +100,27 @@ export async function createOrder(orderData: any) {
         if (productsError) throw new Error("فشل في التحقق من المنتجات");
         if (!dbProducts || dbProducts.length === 0) {
             throw new Error("المنتجات المطلوبة غير موجودة");
+        }
+
+        // --- Availability check: reject if any item is unavailable at this moment ---
+        const unavailableItems: string[] = [];
+        for (const item of validatedData.items) {
+            const dbProduct = dbProducts.find((p: any) => p.id === item.id);
+            if (!dbProduct) continue;
+
+            const isUnavailable = !dbProduct.is_available;
+            const { isAvailable: isScheduled } = isProductCurrentlyAvailable(
+                (dbProduct as any).product_availability ?? []
+            );
+
+            if (isUnavailable || !isScheduled) {
+                unavailableItems.push(dbProduct.name);
+            }
+        }
+        if (unavailableItems.length > 0) {
+            throw new Error(
+                `ITEMS_UNAVAILABLE:${unavailableItems.join(",")}`
+            );
         }
 
         // Fetch all variants and addons for the requested products
@@ -135,22 +157,24 @@ export async function createOrder(orderData: any) {
 
             let itemPrice = dbProduct.price;
 
-            // Add variant price from DB (not from client)
+            // Add variant price from DB — reject if variant was deleted
             if (item.variant?.id) {
                 const variantPrice = dbVariantsMap.get(item.variant.id);
-                if (variantPrice !== undefined) {
-                    itemPrice += variantPrice;
+                if (variantPrice === undefined) {
+                    throw new Error("ITEMS_MODIFIED");
                 }
+                itemPrice += variantPrice;
             }
 
-            // Add addons price from DB (not from client)
+            // Add addons price from DB — reject if any addon was deleted
             if (item.addons && item.addons.length > 0) {
                 for (const addon of item.addons) {
                     if (addon.id) {
                         const addonPrice = dbAddonsMap.get(addon.id);
-                        if (addonPrice !== undefined) {
-                            itemPrice += addonPrice;
+                        if (addonPrice === undefined) {
+                            throw new Error("ITEMS_MODIFIED");
                         }
+                        itemPrice += addonPrice;
                     }
                 }
             }
@@ -244,6 +268,22 @@ export async function createOrder(orderData: any) {
 
         const calculatedTotal = Math.max(0, calculatedSubtotal - calculatedDiscount + calculatedDeliveryFee);
 
+        // --- COUPON: Increment BEFORE order creation to prevent silent bypass ---
+        // If coupon increment fails here, we throw and no order is created.
+        // If order creation later fails, we decrement to compensate.
+        let couponWasIncremented = false;
+        if (validatedData.coupon_code && calculatedDiscount > 0) {
+            const { error: couponRpcError } = await adminClient.rpc("apply_coupon_transaction", {
+                p_coupon_code: validatedData.coupon_code,
+                p_restaurant_id: validatedData.restaurant_id,
+            });
+            if (couponRpcError) {
+                console.error("[RPC Error apply_coupon_transaction pre-order]", couponRpcError);
+                throw new Error("حدث خطأ في تطبيق الخصم. يرجى المحاولة مرة أخرى. | Error applying discount. Please try again. | هەڵە لە جێبەجێکردنی داشکاندن. تکایە دووبارە هەوڵبدە");
+            }
+            couponWasIncremented = true;
+        }
+
         // Build the payload using ONLY server-calculated values
         const payloadToInsert = {
             restaurant_id: validatedData.restaurant_id,
@@ -271,7 +311,26 @@ export async function createOrder(orderData: any) {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            // Compensate: roll back the coupon increment if order insert failed
+            if (couponWasIncremented && validatedData.coupon_code) {
+                // Best-effort rollback: undo the coupon increment
+                const { data: couponRow } = await adminClient
+                    .from("coupons")
+                    .select("id, used_count")
+                    .eq("code", validatedData.coupon_code.toUpperCase())
+                    .eq("restaurant_id", validatedData.restaurant_id)
+                    .single();
+                if (couponRow) {
+                    const { error: rollbackErr } = await adminClient
+                        .from("coupons")
+                        .update({ used_count: Math.max(0, (couponRow.used_count ?? 1) - 1) })
+                        .eq("id", couponRow.id);
+                    if (rollbackErr) console.error("[Coupon rollback failed]", rollbackErr);
+                }
+            }
+            throw error;
+        }
 
         // Insert normalized order_items
         if (data && verifiedItems.length > 0) {
@@ -313,17 +372,6 @@ export async function createOrder(orderData: any) {
                         })
                     )
             );
-        }
-
-        // Increment coupon usage atomically
-        if (validatedData.coupon_code) {
-            const { error: rpcError } = await adminClient.rpc("apply_coupon_transaction", {
-                p_coupon_code: validatedData.coupon_code,
-                p_restaurant_id: validatedData.restaurant_id
-            });
-            if (rpcError) {
-                console.error("[RPC Error apply_coupon_transaction]", rpcError);
-            }
         }
 
         // FCM Push Notification

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, memo } from "react";
 import NextImage from "next/image";
 import { motion } from "framer-motion";
-import { Plus, ImageIcon, Truck } from "lucide-react";
+import { Plus, Check, ImageIcon, Truck } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCartStore } from "@/lib/store/cartStore";
 import { ProductCustomizationModal } from "./ProductCustomizationModal";
@@ -24,12 +24,14 @@ interface MenuItemCardProps {
     isFreeDelivery?: boolean;
 }
 
-export function MenuItemCard({ product, index, isListLayout = false, isDark = false, isFreeDelivery = false }: MenuItemCardProps) {
+export const MenuItemCard = memo(function MenuItemCard({ product, index, isListLayout = false, isDark = false, isFreeDelivery = false }: MenuItemCardProps) {
     const { t, dir, locale } = useTranslation();
     const params = useParams();
     const slug = params.slug as string;
     const addItem = useCartStore((state) => state.addItem);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [justAdded, setJustAdded] = useState(false);
+    const justAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const hasOptions = (product.product_variants && product.product_variants.length > 0) ||
         (product.product_addons && product.product_addons.length > 0);
@@ -51,8 +53,11 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                     price: Number(product.price),
                     image_url: product.image_url || undefined,
                 });
-                // Fix: Also increment view for quick adds to keep stats consistent
                 incrementProductView(product.id);
+                // Visual feedback: show checkmark for 1.5s
+                if (justAddedTimer.current) clearTimeout(justAddedTimer.current);
+                setJustAdded(true);
+                justAddedTimer.current = setTimeout(() => setJustAdded(false), 1500);
             }
         }
     };
@@ -78,6 +83,7 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
     const hasPriceRange = hasVariants && new Set(variants.map(v => Number(v.price))).size > 1;
 
     return (
+        <>
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -93,7 +99,9 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                         alt={localizedName}
                         className="w-[85%] h-[85%] object-contain scale-95 group-hover:scale-105 transition-transform duration-300"
                         fill
-                        unoptimized
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                        loading={index < 4 ? "eager" : "lazy"}
+                        priority={index === 0}
                     />
                 ) : (
                     <div className="w-[85%] h-[85%] rounded-3xl bg-white/50 flex items-center justify-center">
@@ -141,10 +149,14 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                         <div className="mr-auto self-end flex items-center justify-center">
                             <button
                                 onClick={handleAddClick}
-                                className={`${isListLayout ? "w-8 h-8" : "w-8 h-8"} shrink-0 rounded-full text-white flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all z-10`}
-                                style={{ backgroundColor: 'var(--primary)' }}
+                                className={`w-8 h-8 shrink-0 rounded-full text-white flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all z-10`}
+                                style={{ backgroundColor: justAdded ? '#16a34a' : 'var(--primary)' }}
+                                aria-label={justAdded ? t("storefront.addedToCart") : t("storefront.addToCart")}
                             >
-                                <Plus className={isListLayout ? "w-5 h-5" : "w-5 h-5"} />
+                                {justAdded
+                                    ? <Check className="w-4 h-4" />
+                                    : <Plus className="w-5 h-5" />
+                                }
                             </button>
                         </div>
                     ) : (
@@ -152,7 +164,7 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                             {!isScheduledAvailable && !isOutOfStock ? (
                                 <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 px-2 py-0 h-6 text-[9px] flex items-center gap-1">
                                     <Clock className="w-2.5 h-2.5" />
-                                    {nextOpening ? `يتوفر الساعة ${format24to12String(nextOpening)}` : "غير متوفر حالياً"}
+                                    {nextOpening ? t("storefront.availableAt", { time: format24to12String(nextOpening) }) : t("storefront.notAvailableNow")}
                                 </Badge>
                             ) : (
                                 <Badge variant="destructive" className="bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-0 h-6 text-[10px] border-none">
@@ -172,11 +184,12 @@ export function MenuItemCard({ product, index, isListLayout = false, isDark = fa
                 </div>
             )}
 
-            <ProductCustomizationModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                product={product}
-            />
         </motion.div>
+        <ProductCustomizationModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            product={product}
+        />
+        </>
     );
-}
+});

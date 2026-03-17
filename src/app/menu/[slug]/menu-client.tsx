@@ -25,6 +25,8 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
     const { t, dir } = useTranslation();
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const ITEMS_PER_PAGE = 40;
+    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
 
     // Track visit once per session
     useEffect(() => {
@@ -42,6 +44,8 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
         }).catch(() => { }); // fire-and-forget
     }, [restaurant.id]);
 
+    // Use server-fetched data directly — no client refetch needed on initial load.
+    // staleTime: Infinity prevents background refetch; data was already fresh from SSR.
     const { data: products } = useQuery({
         queryKey: ['products', restaurant.id],
         queryFn: async () => {
@@ -56,11 +60,14 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                 `)
                 .eq('restaurant_id', restaurant.id)
                 .eq('is_available', true)
+                .eq('is_hidden', false)
                 .is('deleted_at', null)
                 .order('created_at', { ascending: false });
             return (data || []) as ProductWithCustomization[];
         },
         initialData: initialProducts,
+        staleTime: 5 * 60 * 1000, // 5 min — avoids immediate re-fetch on mount
+        refetchOnWindowFocus: false,
     });
 
     if (restaurant.subscription_status === "expired") {
@@ -79,6 +86,12 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
+        setVisibleCount(ITEMS_PER_PAGE);
+    }, []);
+
+    const handleCategorySelect = useCallback((id: string | null) => {
+        setActiveCategory(id);
+        setVisibleCount(ITEMS_PER_PAGE);
     }, []);
 
     const filtered = products.filter((p) => {
@@ -138,7 +151,7 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                 <div className="px-5 mt-2">
                     <div className="w-full rounded-2xl md:rounded-3xl relative overflow-hidden shadow-sm aspect-[4/1] md:aspect-[6/1] flex flex-col items-center justify-center p-4 md:p-6 text-center" style={{ backgroundColor: primaryColor }}>
                         {restaurant.banner_url ? (
-                            <NextImage src={restaurant.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover opacity-90" fill unoptimized />
+                            <NextImage src={restaurant.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover opacity-90" fill sizes="100vw" priority />
                         ) : null}
 
                         <div className="relative z-10 w-full">
@@ -159,7 +172,7 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                             <CategoryFilter
                                 categories={categories}
                                 activeCategory={activeCategory}
-                                onSelect={setActiveCategory}
+                                onSelect={handleCategorySelect}
                             />
                         </div>
                     )}
@@ -170,15 +183,42 @@ export function MenuPageClient({ restaurant, categories, products: initialProduc
                         {filtered.length === 0 ? (
                             <div className={`text-center py-16 rounded-3xl shadow-sm border ${isDark ? "bg-[#1a1a1a] border-gray-800" : "bg-white border-gray-100"}`}>
                                 <UtensilsCrossed className={`w-14 h-14 mx-auto mb-3 ${isDark ? "text-gray-600" : "text-gray-300"}`} />
-                                <p className="font-medium">{t("storefront.noProductsTitle")}</p>
-                                <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>{t("storefront.noProductsDesc")}</p>
+                                {searchQuery ? (
+                                    <>
+                                        <p className="font-medium">{t("storefront.noSearchResults", { query: searchQuery })}</p>
+                                        <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>{t("storefront.noSearchResultsDesc")}</p>
+                                    </>
+                                ) : activeCategory ? (
+                                    <>
+                                        <p className="font-medium">{t("storefront.noCategoryProducts")}</p>
+                                        <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>{t("storefront.noCategoryProductsDesc")}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="font-medium">{t("storefront.menuEmpty")}</p>
+                                        <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>{t("storefront.menuEmptyDesc")}</p>
+                                    </>
+                                )}
                             </div>
                         ) : (
+                            <>
                             <div className={layoutProducts === "list" ? "flex flex-col gap-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"}>
-                                {filtered.map((product, i) => (
+                                {filtered.slice(0, visibleCount).map((product, i) => (
                                     <MenuItemCard key={product.id} product={product} index={i} isListLayout={layoutProducts === "list"} isDark={isDark} isFreeDelivery={(restaurant as any).is_free_delivery || false} />
                                 ))}
                             </div>
+                            {filtered.length > visibleCount && (
+                                <div className="flex justify-center mt-8">
+                                    <button
+                                        onClick={() => setVisibleCount(prev => prev + ITEMS_PER_PAGE)}
+                                        className="px-8 py-3 rounded-2xl font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+                                        style={{ backgroundColor: 'var(--primary)' }}
+                                    >
+                                        {t("storefront.loadMore")}
+                                    </button>
+                                </div>
+                            )}
+                            </>
                         )}
                     </div>
                 </div>

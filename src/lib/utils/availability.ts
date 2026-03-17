@@ -26,9 +26,11 @@ export function isProductCurrentlyAvailable(availability: AvailabilityRule[] | u
     }
 
     const isAvailable = currentTimeStr >= todayRule.open_time && currentTimeStr <= todayRule.close_time;
+    // Only show nextOpening if we haven't reached today's open time yet (not if close time already passed)
+    const notOpenedYetToday = !isAvailable && currentTimeStr < todayRule.open_time;
 
-    return { 
+    return {
         isAvailable,
-        nextOpening: !isAvailable ? todayRule.open_time : undefined
+        nextOpening: notOpenedYetToday ? todayRule.open_time : undefined
     };
 }

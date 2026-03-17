@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireSuperAdmin } from "@/lib/actions/_auth-guard";
-import { PLAN_LIMITS } from "@/lib/actions/subscription";
+import { PLAN_LIMITS } from "@/lib/constants";
 
 export async function getPlatformMetrics() {
     await requireSuperAdmin();
@@ -718,7 +718,7 @@ export async function getRestaurantDetails(restaurantId: string) {
     const [restaurantRes, ordersRes, productsRes, logsRes] = await Promise.all([
         supabase
             .from("restaurants")
-            .select("*, profiles!restaurants_owner_id_fkey(email, full_name)")
+            .select("id, name, slug, logo_url, subscription_plan, subscription_status, subscription_expires_at, owner_id, created_at, whatsapp_number, profiles!restaurants_owner_id_fkey(email, full_name)")
             .eq("id", restaurantId)
             .single(),
         supabase
@@ -739,7 +739,10 @@ export async function getRestaurantDetails(restaurantId: string) {
             .limit(8),
     ]);
 
-    if (restaurantRes.error || !restaurantRes.data) return null;
+    if (restaurantRes.error || !restaurantRes.data) {
+        console.error("[getRestaurantDetails] Query error:", restaurantRes.error?.message, "| restaurantId:", restaurantId);
+        return null;
+    }
 
     const restaurant = restaurantRes.data;
     const orders = ordersRes.data || [];
@@ -772,9 +775,14 @@ export async function getRestaurantDetails(restaurantId: string) {
         .limit(1)
         .single();
 
+    // Supabase returns joins as arrays — normalize to single object
+    type OwnerProfile = { email: string; full_name: string | null } | null;
+    const profilesRaw = restaurant.profiles as unknown as OwnerProfile[] | OwnerProfile;
+    const ownerProfile: OwnerProfile = Array.isArray(profilesRaw) ? (profilesRaw[0] ?? null) : profilesRaw;
+
     return {
         restaurant,
-        owner: restaurant.profiles,
+        owner: ownerProfile,
         stats: {
             totalOrders,
             totalRevenue,

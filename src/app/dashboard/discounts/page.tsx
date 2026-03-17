@@ -30,17 +30,21 @@ import {
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/client";
 import { getCoupons, createCoupon, deleteCoupon } from "@/lib/actions/discounts";
-import { Plus, Trash2, Tags, Percent, DollarSign, Dices, CalendarOff, Infinity } from "lucide-react";
+import { getSubscriptionStatus } from "@/lib/actions/subscription";
+import { Plus, Trash2, Tags, Percent, DollarSign, Dices, CalendarOff, Infinity, Lock, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/context";
 import type { Coupon } from "@/lib/types/database.types";
 import { arabicToEnglishNumbers } from "@/lib/utils";
+import Link from "next/link";
 
 export default function DiscountsPage() {
     const { t } = useTranslation();
     const [coupons, setCoupons] = useState<Coupon[]>([]);
     const [loading, setLoading] = useState(true);
     const [restaurantId, setRestaurantId] = useState<string | null>(null);
+    const [hasCoupons, setHasCoupons] = useState(false);
+    const [couponLimit, setCouponLimit] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [discountType, setDiscountType] = useState<string>("percentage");
     const [appliesTo, setAppliesTo] = useState<string>("cart");
@@ -69,8 +73,14 @@ export default function DiscountsPage() {
 
             if (profile?.restaurant_id) {
                 setRestaurantId(profile.restaurant_id);
-                const data = await getCoupons(profile.restaurant_id);
+                const [data, subscription] = await Promise.all([
+                    getCoupons(profile.restaurant_id),
+                    getSubscriptionStatus(profile.restaurant_id),
+                ]);
                 setCoupons(data);
+                const allowed = subscription?.features.includes("coupons") ?? false;
+                setHasCoupons(allowed);
+                setCouponLimit(subscription?.usage.coupons.max ?? 0);
 
                 // Fetch products for the Specific Product picker
                 const { data: prods } = await supabase
@@ -174,6 +184,36 @@ export default function DiscountsPage() {
         );
     }
 
+    if (!hasCoupons) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold">{t("sidebar.discounts") || "Discount Engine"}</h1>
+                    <p className="text-muted-foreground text-sm mt-1">{t("discounts.title") || "Create promo codes and manage discounts"}</p>
+                </div>
+                <div className="glass-card rounded-2xl border border-border/50 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-violet-500/5" />
+                    <div className="flex flex-col items-center justify-center py-20 text-center gap-4 relative">
+                        <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center">
+                            <Lock className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold mb-1">كوبونات الخصم</h3>
+                            <p className="text-sm text-muted-foreground max-w-sm">
+                                أنشئ كودات ترويجية وخصومات لزبائنك. متاح في خطة Business وما فوق.
+                            </p>
+                        </div>
+                        <Link href="/dashboard/billing">
+                            <span className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors">
+                                <Crown className="w-4 h-4" /> ترقية الخطة
+                            </span>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -182,6 +222,11 @@ export default function DiscountsPage() {
                     <p className="text-muted-foreground text-sm mt-1">
                         {t("discounts.title") || "Create promo codes and manage discounts"}
                     </p>
+                    {couponLimit < 999999 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {coupons.length} / {couponLimit} كوبون مستخدم
+                        </p>
+                    )}
                 </div>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>

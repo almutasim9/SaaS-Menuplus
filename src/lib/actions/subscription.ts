@@ -2,19 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { checkAddonFeatureAccess } from "@/lib/actions/addons";
-
-export type PlanType = "free" | "pro" | "business";
-
-export const PLAN_LIMITS: Record<PlanType, { max_products: number; max_orders_per_month: number; max_coupons: number }> = {
-    free: { max_products: 15, max_orders_per_month: 50, max_coupons: 3 },
-    pro: { max_products: 100, max_orders_per_month: 500, max_coupons: 20 },
-    business: { max_products: 999999, max_orders_per_month: 999999, max_coupons: 999999 },
-};
+import { type PlanType, PLAN_LIMITS } from "@/lib/constants";
 
 const PLAN_FEATURES: Record<PlanType, string[]> = {
-    free: ["qr_menu", "orders", "basic_analytics"],
-    pro: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "product_scheduling"],
-    business: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "custom_domain", "priority_support", "product_scheduling"],
+    free:     ["qr_menu", "orders", "basic_analytics"],
+    business: ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "product_scheduling"],
+    pro:      ["qr_menu", "orders", "basic_analytics", "advanced_analytics", "theme_customization", "whatsapp_ordering", "coupons", "custom_domain", "priority_support", "product_scheduling"],
 };
 
 export async function getSubscriptionStatus(restaurantId: string) {

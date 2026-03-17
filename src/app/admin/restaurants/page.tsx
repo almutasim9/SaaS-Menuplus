@@ -43,15 +43,15 @@ type Restaurant = {
 };
 
 const planIcons: Record<string, typeof Zap> = {
-    free: Zap,
-    pro: Crown,
-    business: Rocket,
+    free:     Zap,
+    business: Crown,
+    pro:      Rocket,
 };
 
 const planColors: Record<string, string> = {
-    free: "text-gray-400 bg-gray-500/10",
-    pro: "text-emerald-400 bg-emerald-500/10",
-    business: "text-violet-400 bg-violet-500/10",
+    free:     "text-gray-400 bg-gray-500/10",
+    business: "text-emerald-400 bg-emerald-500/10",
+    pro:      "text-violet-400 bg-violet-500/10",
 };
 
 const statusColors: Record<string, string> = {
@@ -347,9 +347,9 @@ function AddRestaurantModal({ open, onClose, onCreated }: { open: boolean; onClo
                                     <label className="text-xs font-medium text-gray-300 mb-2 block">الخطة</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {[
-                                            { id: "free", label: "مجانية", icon: Zap, desc: "15 منتج", color: "gray" },
-                                            { id: "pro", label: "احترافية", icon: Crown, desc: "100 منتج", color: "emerald" },
-                                            { id: "business", label: "أعمال", icon: Rocket, desc: "غير محدود", color: "violet" },
+                                            { id: "free",     label: "مجانية",   icon: Zap,    desc: "15 منتج",    color: "gray" },
+                                            { id: "business", label: "أعمال",    icon: Crown,  desc: "100 منتج",   color: "emerald" },
+                                            { id: "pro",      label: "احترافية", icon: Rocket, desc: "غير محدود", color: "violet" },
                                         ].map(p => (
                                             <button
                                                 key={p.id}
@@ -725,8 +725,8 @@ export default function AdminRestaurantsPage() {
                                                     className="h-8 px-2 rounded-lg bg-secondary/30 border border-border/40 text-xs"
                                                 >
                                                     <option value="free">مجاني</option>
-                                                    <option value="pro">احترافي</option>
                                                     <option value="business">أعمال</option>
+                                                    <option value="pro">احترافي</option>
                                                 </select>
                                                 {status === "active" ? (
                                                     <button onClick={() => handleSuspend(r.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors" title="تعليق">

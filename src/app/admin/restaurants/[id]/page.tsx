@@ -26,11 +26,11 @@ const addonIcons: Record<AddonKey, typeof Zap> = {
     custom_domain: Globe,
 };
 
-const planIcons: Record<string, typeof Zap> = { free: Zap, pro: Crown, business: Rocket };
+const planIcons: Record<string, typeof Zap> = { free: Zap, business: Crown, pro: Rocket };
 const planColors: Record<string, string> = {
-    free: "text-gray-400 bg-gray-500/10",
-    pro: "text-emerald-400 bg-emerald-500/10",
-    business: "text-violet-400 bg-violet-500/10",
+    free:     "text-gray-400 bg-gray-500/10",
+    business: "text-emerald-400 bg-emerald-500/10",
+    pro:      "text-violet-400 bg-violet-500/10",
 };
 const planLabels: Record<string, string> = { free: "مجاني", pro: "احترافي", business: "أعمال" };
 const statusColors: Record<string, string> = {
@@ -97,7 +97,7 @@ function ExtendModal({ open, onClose, restaurantId, currentPlan, onExtended }: {
                 <div>
                     <label className="text-xs text-gray-400 mb-2 block">تغيير الخطة (اختياري)</label>
                     <div className="grid grid-cols-3 gap-2">
-                        {["free", "pro", "business"].map(p => {
+                        {["free", "business", "pro"].map(p => {
                             const Icon = planIcons[p];
                             return (
                                 <button
@@ -157,6 +157,9 @@ export default function RestaurantDetailsPage() {
         ]).then(([d, a]) => {
             setData(d);
             setAddons(a);
+        }).catch(err => {
+            console.error("[RestaurantDetails]", err);
+        }).finally(() => {
             setLoading(false);
         });
     }, [restaurantId]);
@@ -404,7 +407,7 @@ export default function RestaurantDetailsPage() {
                                     </button>
                                     <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10">
                                         <div className="bg-[#141414] border border-white/[0.06] rounded-xl overflow-hidden shadow-xl min-w-28">
-                                            {["free", "pro", "business"].map(p => (
+                                            {["free", "business", "pro"].map(p => (
                                                 <button
                                                     key={p}
                                                     onClick={() => handleChangePlan(p)}

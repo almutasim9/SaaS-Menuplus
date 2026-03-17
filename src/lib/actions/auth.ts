@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { signUpSchema } from "@/lib/validations/schemas";
 import { z } from "zod";
-import { PLAN_LIMITS } from "@/lib/actions/subscription";
+import { PLAN_LIMITS } from "@/lib/constants";
 
 export async function signUp(formData: FormData) {
     const supabase = await createClient();
@@ -109,7 +109,7 @@ export async function signIn(formData: FormData) {
 export async function signOut() {
     const supabase = await createClient();
     await supabase.auth.signOut();
-    redirect("/login");
+    return { success: true };
 }
 
 export async function getSession() {
