@@ -50,6 +50,7 @@ export async function updateAppearance(restaurantId: string, formData: FormData)
         font_family: formData.get("font_family") as string || "cairo",
         show_search: formData.get("show_search") === "true",
         welcome_message: formData.get("welcome_message") as string || "",
+        theme: formData.get("theme") as string || "glass",
     };
 
     // Existing theme_settings pass-through for images if they exist

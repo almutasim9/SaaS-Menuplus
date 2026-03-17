@@ -71,6 +71,7 @@ export default function AppearancePage() {
     const [layoutProducts, setLayoutProducts] = useState("grid");
     const [layoutCategories, setLayoutCategories] = useState("pills");
     const [fontFamily, setFontFamily] = useState("cairo");
+    const [selectedTheme, setSelectedTheme] = useState("glass");
     const [showSearch, setShowSearch] = useState(true);
     const [welcomeMessage, setWelcomeMessage] = useState("");
     const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -138,6 +139,7 @@ export default function AppearancePage() {
                             if (settings.welcome_message) setWelcomeMessage(settings.welcome_message);
                             if (settings.favicon_url) setFaviconUrl(settings.favicon_url);
                             if (settings.default_product_image) setDefaultProductImageUrl(settings.default_product_image);
+                            if (settings.theme) setSelectedTheme(settings.theme);
                         }
                     }
                 } catch (err) {
@@ -163,6 +165,7 @@ export default function AppearancePage() {
         formData.set("layout_products", layoutProducts);
         formData.set("layout_categories", layoutCategories);
         formData.set("font_family", fontFamily);
+        formData.set("theme", selectedTheme);
         formData.set("show_search", showSearch ? "true" : "false");
         formData.set("welcome_message", welcomeMessage);
         formData.set("whatsapp_number", whatsappNumber);
@@ -349,6 +352,54 @@ export default function AppearancePage() {
                                     <LayoutTemplate className="w-5 h-5 text-primary" />
                                     <h2 className="text-lg font-semibold">Layout & Style Settings</h2>
                                 </div>
+                                
+                                <div className="space-y-4">
+                                    <Label>Menu Theme</Label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedTheme("glass")}
+                                            className={`relative aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all ${selectedTheme === "glass" ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]" : "border-border/50 hover:border-primary/50"}`}
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/20 dark:to-emerald-900/10 flex items-center justify-center">
+                                                <div className="glass-card w-2/3 h-1/2 rounded-lg flex items-center justify-center p-2">
+                                                    <div className="space-y-1 w-full">
+                                                        <div className="h-1 w-1/2 bg-primary/20 rounded mx-auto" />
+                                                        <div className="h-1 w-2/3 bg-primary/10 rounded mx-auto" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {selectedTheme === "glass" && (
+                                                <div className="absolute top-2 right-2 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                            )}
+                                            <div className="absolute bottom-0 inset-x-0 p-2 bg-background/80 backdrop-blur-sm text-center">
+                                                <span className="text-[10px] font-bold">Glassmorphism</span>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedTheme("grid")}
+                                            className={`relative aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all ${selectedTheme === "grid" ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]" : "border-border/50 hover:border-primary/50"}`}
+                                        >
+                                            <div className="absolute inset-0 bg-secondary/30 grid grid-cols-2 gap-1 p-2">
+                                                {[1, 2, 3, 4].map(i => (
+                                                    <div key={i} className="bg-background rounded-md border border-border/50" />
+                                                ))}
+                                            </div>
+                                            {selectedTheme === "grid" && (
+                                                <div className="absolute top-2 right-2 w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center">
+                                                    <Check className="w-3 h-3" />
+                                                </div>
+                                            )}
+                                            <div className="absolute bottom-0 inset-x-0 p-2 bg-background/80 backdrop-blur-sm text-center">
+                                                <span className="text-[10px] font-bold">Modern Grid</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
 
                                 <div className="space-y-2">
                                     <Label>Theme Mode</Label>
@@ -514,44 +565,62 @@ export default function AppearancePage() {
 
                         <div className="w-full h-full pb-10" style={{ backgroundColor: themeMode === 'dark' ? '#0a0a0a' : secondaryColor, color: themeMode === 'dark' ? '#fff' : '#000' }}>
 
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-4 pt-6 pb-2">
-                                <div className="flex-1 max-w-[140px]">
-                                    {showSearch && (
-                                        <div className="h-8 rounded-full bg-foreground/5 border border-foreground/5 flex items-center px-3">
-                                            <span className="text-[10px] opacity-40">ابحث عن طبقك...</span>
+                            {/* Dynamic Theme Header */}
+                            {selectedTheme === "glass" ? (
+                                <>
+                                    <div className="flex items-center justify-between px-4 pt-6 pb-2">
+                                        <div className="flex-1 max-w-[140px]">
+                                            {showSearch && (
+                                                <div className="h-8 rounded-full bg-foreground/5 border border-foreground/5 flex items-center px-3">
+                                                    <span className="text-[10px] opacity-40">ابحث عن طبقك...</span>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="font-bold text-sm">{restaurantName || "قائمة الطعام"}</h3>
-                                    <UtensilsCrossed className="w-4 h-4" style={{ color: primaryColor }} />
-                                </div>
-                            </div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-bold text-sm">{restaurantName || "قائمة الطعام"}</h3>
+                                            <UtensilsCrossed className="w-4 h-4" style={{ color: primaryColor }} />
+                                        </div>
+                                    </div>
 
-                            {/* Banner */}
-                            <div className="px-4 mt-2">
-                                <div className="w-full rounded-2xl relative overflow-hidden shadow-sm aspect-[2.5/1] flex flex-col items-center justify-center p-4 text-center" style={{ backgroundColor: primaryColor }}>
+                                    <div className="px-4 mt-2">
+                                        <div className="w-full rounded-2xl relative overflow-hidden shadow-sm aspect-[2.5/1] flex flex-col items-center justify-center p-4 text-center" style={{ backgroundColor: primaryColor }}>
+                                            {bannerPreview || bannerUrl ? (
+                                                <NextImage src={bannerPreview || bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" fill unoptimized />
+                                            ) : null}
+                                            <div className="relative z-10 w-full">
+                                                <h2 className="text-white text-[11px] font-bold drop-shadow-sm">
+                                                    {welcomeMessage || (restaurantName ? `مرحباً بك في ${restaurantName}` : "مرحباً بك في مطعمنا")}
+                                                </h2>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="relative h-44 w-full overflow-hidden">
                                     {bannerPreview || bannerUrl ? (
-                                        <NextImage src={bannerPreview || bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" fill unoptimized />
-                                    ) : null}
-                                    <div className="relative z-10 w-full">
-                                        <h2 className="text-white text-sm font-bold drop-shadow-sm">
-                                            {welcomeMessage || (restaurantName ? `مرحباً بك في ${restaurantName}` : "مرحباً بك في مطعمنا")}
-                                        </h2>
+                                        <NextImage src={bannerPreview || bannerUrl!} alt="" className="absolute inset-0 w-full h-full object-cover" fill unoptimized />
+                                    ) : <div className="absolute inset-0" style={{ backgroundColor: primaryColor }} />}
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                                        <div className="w-12 h-12 rounded-xl bg-white p-1 mb-2 shadow-xl">
+                                            {logoPreview || logoUrl ? (
+                                                <NextImage src={logoPreview || logoUrl!} alt="" className="w-full h-full object-contain" width={48} height={48} unoptimized />
+                                            ) : <UtensilsCrossed className="w-6 h-6 text-zinc-400" />}
+                                        </div>
+                                        <h1 className="text-white text-sm font-black uppercase tracking-widest">{restaurantName || "قائمة الطعام"}</h1>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Content */}
                             <div className="mt-6 bg-transparent h-full">
                                 {/* Categories array */}
                                 {layoutCategories === "pills" && (
-                                    <div className="flex gap-2 mb-6 overflow-hidden px-4 justify-end flex-row-reverse">
+                                    <div className={`flex gap-2 mb-6 overflow-hidden px-4 ${selectedTheme === 'grid' ? 'justify-center' : 'justify-end flex-row-reverse'}`}>
                                         {["الكل", "الأطباق", "المقبلات"].map((cat, i) => (
                                             <div
                                                 key={cat}
-                                                className="px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                                                className="px-3 py-1.5 rounded-full text-[9px] font-bold whitespace-nowrap"
                                                 style={{
                                                     backgroundColor: i === 0 ? primaryColor : "rgba(0,0,0,0.05)",
                                                     color: i === 0 ? "white" : undefined,
